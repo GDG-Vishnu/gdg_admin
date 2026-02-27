@@ -60,3 +60,31 @@ model User {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
+
+model Form {
+    id          String         @id @default(cuid())
+    title       String
+    description String?
+    fields      Json           // Stores array of FormField objects (with stepId)
+    steps       Json?          // Stores array of FormStep objects
+    isActive    Boolean        @default(true)
+    createdAt   DateTime       @default(now())
+    updatedAt   DateTime       @updatedAt
+    responses   FormResponse[]
+
+    @@index([title])
+    @@index([createdAt])
+    @@map("forms")
+}
+
+model FormResponse {
+    id          String   @id @default(cuid())
+    formId      String
+    form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+    data        Json     // Stores the complete response data
+    submittedAt DateTime @default(now())
+
+    @@index([formId])
+    @@index([submittedAt])
+    @@map("form_responses")
+}

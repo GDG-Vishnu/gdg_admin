@@ -48,6 +48,11 @@ const menuItems = [
     icon: Calendar,
   },
   {
+    title: "Forms",
+    url: "/admin/forms",
+    icon: FileText,
+  },
+  {
     title: "Form Builder",
     url: "/admin/form-builder",
     icon: FileText,
@@ -115,14 +120,7 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <div className="flex items-center justify-between gap-2 px-2 py-1">
-              <span className="text-xs font-medium group-data-[collapsible=icon]:hidden">
-                Theme
-              </span>
-              <ModeToggle />
-            </div>
-          </SidebarMenuItem>
+         
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
               <LogOut className="h-4 w-4" />
