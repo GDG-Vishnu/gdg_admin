@@ -45,6 +45,11 @@ type Event = {
   MembersParticipated: number;
 };
 
+function cloudinaryOptimized(url: string, width: number, height: number): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/c_fill,w_${width},h_${height},q_auto,f_auto/`);
+}
+
 function getThemeColors(theme: string[] | null) {
   const defaultTheme = ["#f75590", "#f75590", "#ff7eb3", "#F44336", "#3D85C6"];
   const colors = theme && theme.length >= 5 ? theme : defaultTheme;
@@ -270,10 +275,11 @@ export default function EventDetailPage() {
                   }}
                 >
                   <Image
-                    src={imageUrl}
+                    src={cloudinaryOptimized(imageUrl, 800, 600)}
                     alt={`${event.title} Gallery ${index + 1}`}
                     width={400}
                     height={300}
+                    loading="lazy"
                     className="w-full h-60 object-cover"
                   />
                 </div>
@@ -301,12 +307,11 @@ export default function EventDetailPage() {
               aria-hidden
               className="absolute inset-0"
               style={{
-                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
-                backgroundSize: "20px 20px, 40px 40px",
-                backgroundPosition: "0 0, 10px 10px",
-                opacity: 1,
+                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)`,
+                backgroundSize: "20px 20px",
                 pointerEvents: "none",
                 borderRadius: 28,
+                willChange: "transform",
               }}
             />
 
@@ -323,6 +328,7 @@ export default function EventDetailPage() {
                 <img
                   src="https://res.cloudinary.com/duvr3z2z0/image/upload/v1764655440/Group_6_mczuk3.png"
                   alt=""
+                  loading="lazy"
                 />
               </div>
             </div>
@@ -335,12 +341,11 @@ export default function EventDetailPage() {
               aria-hidden
               className="absolute inset-0"
               style={{
-                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
-                backgroundSize: "20px 20px, 40px 40px",
-                backgroundPosition: "0 0, 10px 10px",
-                opacity: 1,
+                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)`,
+                backgroundSize: "20px 20px",
                 pointerEvents: "none",
                 borderRadius: 28,
+                willChange: "transform",
               }}
             />
 
@@ -358,8 +363,8 @@ export default function EventDetailPage() {
                     {event.keyHighlights.map((highlight, index) => (
                       <div
                         key={index}
-                        className="flex items-start gap-4 p-4 bg-[#1a1a1a] rounded-2xl border border-stone-800 transition-colors"
-                        style={{ borderColor: "transparent" }}
+                        className="flex items-start gap-4 p-4 bg-[#1a1a1a] rounded-2xl border border-transparent transition-colors"
+                        style={{ ['--hover-border' as string]: theme.primary } as React.CSSProperties}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.borderColor = theme.primary)
                         }
@@ -488,7 +493,7 @@ export default function EventDetailPage() {
                 )}
                 <Link
                   href="/admin/events"
-                  className="px-8 py-4 bg-white/20 text-white rounded-full text-lg font-semibold hover:bg-white/30 transition-colors flex items-center gap-2 backdrop-blur-sm"
+                  className="px-8 py-4 bg-white/20 text-white rounded-full text-lg font-semibold hover:bg-white/30 transition-colors flex items-center gap-2"
                 >
                   <ArrowLeft className="w-5 h-5" />
                   View All Events
