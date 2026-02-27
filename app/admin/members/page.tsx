@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/admin/layout/PageHeader";
 import { Users, UserPlus, UserCheck, UserX, Loader2 } from "lucide-react";
+import GoogleLoader from "@/components/GoogleLoader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +36,6 @@ export default function MembersPage() {
       try {
         const res = await fetch("/api/admin/members");
         const json = await res.json();
-        console.log("API response:", json);
         if (Array.isArray(json)) {
           setMembers(json);
         } else if (json.error) {
@@ -55,8 +55,6 @@ export default function MembersPage() {
 
   function handleGo(e: React.FormEvent) {
     e.preventDefault();
-    console.log("Operation:", operation, "| Identifier:", identifier);
-    // TODO: handle CRUD operation
   }
 
   const stats = [
@@ -90,7 +88,6 @@ export default function MembersPage() {
     <div className="flex flex-col">
       <PageHeader title="Members" />
 
-      {/* Main Content */}
       <div className="flex-1 space-y-6 p-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Team Members</h2>
@@ -99,7 +96,6 @@ export default function MembersPage() {
           </p>
         </div>
 
-        {/* CRUD Form */}
         <form
           onSubmit={handleGo}
           className="flex items-end gap-4 rounded-lg border p-4"
@@ -134,7 +130,6 @@ export default function MembersPage() {
           <Button type="submit">GO</Button>
         </form>
 
-        {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
@@ -157,10 +152,9 @@ export default function MembersPage() {
           })}
         </div>
 
-        {/* Members Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <GoogleLoader message="Loading members..." />
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">

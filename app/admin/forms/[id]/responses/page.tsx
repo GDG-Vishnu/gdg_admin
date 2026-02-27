@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import GoogleLoader from "@/components/GoogleLoader";
 import {
   Card,
   CardContent,
@@ -44,9 +45,7 @@ interface Form {
   description: string;
   isActive: boolean;
   fields: FormField[];
-  _count: {
-    responses: number;
-  };
+  responseCount: number;
 }
 
 interface FormResponse {
@@ -72,7 +71,6 @@ export default function FormResponsesPage() {
   const loadFormAndResponses = async () => {
     setIsLoading(true);
     try {
-      // Load form details
       const formResponse = await fetch(`/api/forms/${formId}`);
       if (formResponse.ok) {
         const formData = await formResponse.json();
@@ -81,7 +79,6 @@ export default function FormResponsesPage() {
         console.error("Failed to load form");
       }
 
-      // Load responses
       const responsesResponse = await fetch(`/api/forms/${formId}/responses`);
       if (responsesResponse.ok) {
         const responsesData = await responsesResponse.json();
@@ -99,16 +96,13 @@ export default function FormResponsesPage() {
   const exportToCSV = () => {
     if (!form || responses.length === 0) return;
 
-    // Create CSV header
     const headers = form.fields.map((field) => field.label);
     const csvHeaders = ["Submission Date", ...headers].join(",");
 
-    // Create CSV rows
     const csvRows = responses.map((response) => {
       const date = new Date(response.submittedAt).toLocaleString();
       const values = form.fields.map((field) => {
         const value = response.data[field.id] || "";
-        // Escape commas and quotes
         if (
           typeof value === "string" &&
           (value.includes(",") || value.includes('"'))
@@ -120,7 +114,6 @@ export default function FormResponsesPage() {
       return [date, ...values].join(",");
     });
 
-    // Combine and create download
     const csvContent = [csvHeaders, ...csvRows].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -136,7 +129,7 @@ export default function FormResponsesPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <GoogleLoader message="Loading responses..." />
       </div>
     );
   }

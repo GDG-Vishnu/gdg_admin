@@ -1,49 +1,75 @@
 import "dotenv/config";
-import { prisma } from "../lib/prisma";
+import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import * as crypto from "crypto";
 
+const serviceAccount: ServiceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+};
+
+const app = initializeApp({
+  credential: cert(serviceAccount),
+});
+
+const db = getFirestore(app);
 
 async function main() {
-  const dbUrl = process.env.DATABASE_URL;
-  console.log("Checking DATABASE_URL...");
-  if (!dbUrl) {
-    console.error("❌ DATABASE_URL is missing or empty!");
-  } else {
-    console.log(`✅ DATABASE_URL found (length: ${dbUrl.length})`);
-    console.log(`Starts with: ${dbUrl.substring(0, 15)}...`);
+  console.log("Checking Firebase credentials...");
+  if (!process.env.FIREBASE_PROJECT_ID) {
+    console.error("FIREBASE_PROJECT_ID is missing or empty!");
+    process.exit(1);
   }
+  console.log(`FIREBASE_PROJECT_ID found: ${process.env.FIREBASE_PROJECT_ID}`);
 
   const email = "dev@gdg.vitb.in";
   const password = "1234567890";
-  // Using SHA-256 for consistency with previous scripts/addAdmin.ts
-  const passwordHash = crypto.createHash("sha256").update(password).digest("hex");
+  const passwordHash = crypto
+    .createHash("sha256")
+    .update(password)
+    .digest("hex");
 
   console.log(`Seeding user: ${email}...`);
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {
+  // Check if user exists
+  const existingSnapshot = await db
+    .collection("users")
+    .where("email", "==", email)
+    .limit(1)
+    .get();
+
+  if (!existingSnapshot.empty) {
+    // Update existing user
+    const existingDoc = existingSnapshot.docs[0];
+    await existingDoc.ref.update({
       password: passwordHash,
-      // Ensure other fields are kept or updated as needed (e.g. ensure isAdmin is true?)
-      isAdmin: true, 
-    },
-    create: {
+      isAdmin: true,
+      updatedAt: new Date().toISOString(),
+    });
+    console.log("User updated successfully:", {
+      id: existingDoc.id,
+      ...existingDoc.data(),
+    });
+  } else {
+    // Create new user
+    const docRef = await db.collection("users").add({
       email,
       name: "Dev User",
       password: passwordHash,
       isAdmin: true,
-    },
-  });
-
-  console.log("User seeded successfully:", user);
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const createdDoc = await docRef.get();
+    console.log("User seeded successfully:", {
+      id: createdDoc.id,
+      ...createdDoc.data(),
+    });
+  }
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

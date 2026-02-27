@@ -47,7 +47,6 @@ export default function EventsPage() {
                   className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none bg-gradient-to-r from-white to-slate-50/50 shadow-md cursor-pointer"
                 >
                 <div className="flex flex-col md:flex-row min-h-[160px]">
-                  {/* Left Section: Image/Visual */}
                   <div className="relative w-full md:w-64 h-48 md:h-auto overflow-hidden">
                     {event.imageUrl ? (
                       <img
@@ -71,7 +70,6 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  {/* Right Section: Details */}
                   <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">

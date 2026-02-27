@@ -1,7 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import { NextRequest, NextResponse } from "next/server";
 
-// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -17,12 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Convert file to base64
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const base64File = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(base64File, {
       folder: "gdg_uploads",
       resource_type: "auto",
@@ -47,7 +44,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Get recent uploads
 export async function GET() {
   try {
     const result = await cloudinary.api.resources({

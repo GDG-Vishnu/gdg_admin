@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
+import { signToken, getAuthCookieConfig } from "@/lib/auth";
 import * as crypto from "crypto";
 
 export async function POST(request: NextRequest) {
@@ -9,38 +10,54 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json(
         { success: false, error: "Email and password are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const usersSnapshot = await db
+      .collection("users")
+      .where("email", "==", email)
+      .limit(1)
+      .get();
 
-    if (!user) {
+    if (usersSnapshot.empty) {
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Hash password to compare
-    const passwordHash = crypto.createHash("sha256").update(password).digest("hex");
+    const userDoc = usersSnapshot.docs[0];
+    const user = { id: userDoc.id, ...userDoc.data() } as {
+      id: string;
+      email: string;
+      name: string;
+      password: string;
+      isAdmin: boolean;
+    };
+
+    const passwordHash = crypto
+      .createHash("sha256")
+      .update(password)
+      .digest("hex");
 
     if (user.password !== passwordHash) {
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // Generate token (simple implementation for now)
-    const token = Buffer.from(`${user.id}:${user.email}:${Date.now()}`).toString("base64");
+    const token = await signToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isAdmin: user.isAdmin,
+    });
 
-    return NextResponse.json({
+    const cookieConfig = getAuthCookieConfig(token);
+    const response = NextResponse.json({
       success: true,
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -49,11 +66,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    response.cookies.set(
+      cookieConfig.name,
+      cookieConfig.value,
+      {
+        httpOnly: cookieConfig.httpOnly,
+        secure: cookieConfig.secure,
+        sameSite: cookieConfig.sameSite,
+        path: cookieConfig.path,
+        maxAge: cookieConfig.maxAge,
+      },
+    );
+
+    return response;
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(
       { success: false, error: "Login failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

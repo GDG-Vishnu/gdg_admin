@@ -1,27 +1,31 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
 
-// GET a specific form
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const form = await prisma.form.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: { responses: true },
-        },
-      },
-    });
+    const docRef = db.collection("forms").doc(id);
+    const doc = await docRef.get();
 
-    if (!form) {
+    if (!doc.exists) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    return NextResponse.json(form);
+    const responsesSnapshot = await db
+      .collection("form_responses")
+      .where("formId", "==", id)
+      .count()
+      .get();
+
+    return NextResponse.json({
+      id: doc.id,
+      ...doc.data(),
+      responseCount: responsesSnapshot.data().count,
+    });
   } catch (error) {
     console.error("Error fetching form:", error);
     return NextResponse.json(
@@ -31,7 +35,6 @@ export async function GET(
   }
 }
 
-// PUT update a form
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -41,19 +44,27 @@ export async function PUT(
     const body = await request.json();
     const { title, description, fields, steps, isActive } = body;
 
-    const updatedForm = await prisma.form.update({
-      where: { id },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(fields && { fields }),
-        ...(steps !== undefined && { steps }),
-        ...(isActive !== undefined && { isActive }),
-        updatedAt: new Date(),
-      },
-    });
+    const docRef = db.collection("forms").doc(id);
+    const doc = await docRef.get();
 
-    return NextResponse.json(updatedForm);
+    if (!doc.exists) {
+      return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    }
+
+    const updateData: Record<string, unknown> = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (title) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (fields) updateData.fields = fields;
+    if (steps !== undefined) updateData.steps = steps;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    await docRef.update(updateData);
+
+    const updatedDoc = await docRef.get();
+    return NextResponse.json({ id: updatedDoc.id, ...updatedDoc.data() });
   } catch (error) {
     console.error("Error updating form:", error);
     return NextResponse.json(
@@ -63,16 +74,44 @@ export async function PUT(
   }
 }
 
-// DELETE a form
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    await prisma.form.delete({
-      where: { id },
-    });
+    const docRef = db.collection("forms").doc(id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return NextResponse.json({ error: "Form not found" }, { status: 404 });
+    }
+
+    // Firestore batches are limited to 500 operations, so chunk if needed
+    const responsesSnapshot = await db
+      .collection("form_responses")
+      .where("formId", "==", id)
+      .get();
+
+    const BATCH_LIMIT = 499; // reserve 1 slot for the form doc itself in the last batch
+    const responseDocs = responsesSnapshot.docs;
+
+    for (let i = 0; i < responseDocs.length; i += BATCH_LIMIT) {
+      const chunk = responseDocs.slice(i, i + BATCH_LIMIT);
+      const isLastChunk = i + BATCH_LIMIT >= responseDocs.length;
+      const batch = db.batch();
+      chunk.forEach((responseDoc) => {
+        batch.delete(responseDoc.ref);
+      });
+      if (isLastChunk) {
+        batch.delete(docRef);
+      }
+      await batch.commit();
+    }
+
+    if (responseDocs.length === 0) {
+      await docRef.delete();
+    }
 
     return NextResponse.json({ message: "Form deleted successfully" });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
 
-// GET all responses for a form
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -9,25 +9,31 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Verify form exists
-    const form = await prisma.form.findUnique({
-      where: { id },
-    });
+    const formRef = db.collection("forms").doc(id);
+    const formDoc = await formRef.get();
 
-    if (!form) {
+    if (!formDoc.exists) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    const responses = await prisma.formResponse.findMany({
-      where: { formId: id },
-      orderBy: { submittedAt: "desc" },
-    });
+    const formData = formDoc.data()!;
+
+    const responsesSnapshot = await db
+      .collection("form_responses")
+      .where("formId", "==", id)
+      .orderBy("submittedAt", "desc")
+      .get();
+
+    const responses = responsesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
     return NextResponse.json({
       form: {
-        id: form.id,
-        title: form.title,
-        description: form.description,
+        id: formDoc.id,
+        title: formData.title,
+        description: formData.description,
       },
       responses,
       count: responses.length,
@@ -41,7 +47,6 @@ export async function GET(
   }
 }
 
-// POST submit a new response
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -50,23 +55,22 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
 
-    // Verify form exists and is active
-    const form = await prisma.form.findUnique({
-      where: { id },
-    });
+    const formRef = db.collection("forms").doc(id);
+    const formDoc = await formRef.get();
 
-    if (!form) {
+    if (!formDoc.exists) {
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    if (!form.isActive) {
+    const formData = formDoc.data()!;
+
+    if (!formData.isActive) {
       return NextResponse.json(
         { error: "Form is no longer accepting responses" },
         { status: 403 },
       );
     }
 
-    // Validate response data structure
     if (!body.data || typeof body.data !== "object") {
       return NextResponse.json(
         { error: "Invalid response data" },
@@ -74,14 +78,17 @@ export async function POST(
       );
     }
 
-    const response = await prisma.formResponse.create({
-      data: {
-        formId: id,
-        data: body.data,
-      },
+    const docRef = await db.collection("form_responses").add({
+      formId: id,
+      data: body.data,
+      submittedAt: FieldValue.serverTimestamp(),
     });
 
-    return NextResponse.json(response, { status: 201 });
+    const createdDoc = await docRef.get();
+    return NextResponse.json(
+      { id: createdDoc.id, ...createdDoc.data() },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error submitting response:", error);
     return NextResponse.json(

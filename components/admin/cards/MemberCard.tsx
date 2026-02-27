@@ -36,7 +36,6 @@ export default function MemberCard({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Editable form state
   const [form, setForm] = useState({
     name: name || "",
     designation: designation || "",
@@ -81,7 +80,6 @@ export default function MemberCard({
         setError(data.error || "Update failed");
       } else {
         setSaved(true);
-        // Reload the page to reflect changes
         setTimeout(() => window.location.reload(), 800);
       }
     } catch {

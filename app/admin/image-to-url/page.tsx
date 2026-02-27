@@ -58,14 +58,12 @@ export default function ImageToUrlPage() {
       if (data.success) {
         setRecentUploads(data.resources);
 
-        // Calculate stats
         const total = data.resources.length;
         const totalBytes = data.resources.reduce(
           (acc: number, resource: CloudinaryResource) => acc + resource.bytes,
           0,
         );
 
-        // Calculate this month's uploads
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const thisMonthCount = data.resources.filter(
@@ -92,7 +90,6 @@ export default function ImageToUrlPage() {
   };
 
   const handleUploadComplete = (image: UploadedImage) => {
-    // Refresh the list
     fetchRecentUploads();
   };
 

@@ -36,9 +36,7 @@ interface FormStats {
   createdAt: string;
   updatedAt: string;
   fields: any[];
-  _count: {
-    responses: number;
-  };
+  responseCount: number;
 }
 
 export default function FormsPage() {
@@ -124,7 +122,7 @@ export default function FormsPage() {
     {
       title: "Total Responses",
       value: forms
-        .reduce((sum, form) => sum + form._count.responses, 0)
+        .reduce((sum, form) => sum + form.responseCount, 0)
         .toString(),
       description: "All form submissions",
       icon: Users,
@@ -147,7 +145,6 @@ export default function FormsPage() {
     <div className="flex flex-col">
       <PageHeader title="Forms Management" />
 
-      {/* Main Content */}
       <div className="flex-1 space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -164,7 +161,6 @@ export default function FormsPage() {
           </Link>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
@@ -187,7 +183,6 @@ export default function FormsPage() {
           })}
         </div>
 
-        {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -223,7 +218,6 @@ export default function FormsPage() {
           </div>
         </div>
 
-        {/* Forms Grid */}
         {isLoading ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
@@ -282,7 +276,7 @@ export default function FormsPage() {
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        {form._count.responses}
+                        {form.responseCount}
                       </span>
                       <span className="flex items-center gap-1">
                         <FileText className="h-3 w-3" />
@@ -321,7 +315,6 @@ export default function FormsPage() {
           </div>
         )}
 
-        {/* Empty State */}
         {filteredForms.length === 0 && (
           <Card className="text-center py-12">
             <CardContent>

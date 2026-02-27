@@ -72,8 +72,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// --- Types ---
-
 export type ElementType =
   | "text"
   | "textarea"
@@ -92,9 +90,9 @@ export interface FormElement {
   placeholder?: string;
   required: boolean;
   helpText?: string;
-  options?: string[]; // For select, radio
+  options?: string[];
   defaultValue?: string | boolean | number;
-  stepId: string; // NEW: Associates element with a step
+  stepId: string;
 }
 
 export interface FormStep {
@@ -119,8 +117,6 @@ const ELEMENT_TYPES: {
   { type: "file", icon: Upload, label: "File Upload" },
   { type: "switch", icon: ToggleLeft, label: "Switch" },
 ];
-
-// --- Sub-Components ---
 
 function SidebarDraggableItem({
   type,
@@ -287,7 +283,6 @@ function SortableCanvasElement({
   );
 }
 
-// Preview Component with Step Navigation
 function PreviewForm({
   steps,
   elements,
@@ -471,8 +466,6 @@ function PreviewForm({
   );
 }
 
-// --- Main Component ---
-
 interface FormBuilderProps {
   formId?: string; // If provided, we're editing an existing form
   initialData?: {
@@ -519,7 +512,6 @@ export default function FormBuilder({
   const [isEditingStepId, setIsEditingStepId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialize current step
   React.useEffect(() => {
     if (!currentStepId && steps.length > 0) {
       setCurrentStepId(steps[0].id);
@@ -549,7 +541,6 @@ export default function FormBuilder({
 
     if (!over) return;
 
-    // Drop from sidebar
     if (active.data.current?.isSidebar) {
       const type = active.data.current.type as ElementType;
       const newElement: FormElement = {
@@ -569,7 +560,6 @@ export default function FormBuilder({
         setElements((prev) => [...prev, newElement]);
         setSelectedElementId(newElement.id);
       } else {
-        // Drop over existing item (insert index)
         const overIndex = elements.findIndex((el) => el.id === over.id);
         if (overIndex !== -1) {
           const newElements = [...elements];
@@ -584,7 +574,6 @@ export default function FormBuilder({
       return;
     }
 
-    // Reorder existing
     if (active.id !== over.id) {
       setElements((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
@@ -624,7 +613,6 @@ export default function FormBuilder({
     toast.success("Element duplicated");
   };
 
-  // Step management functions
   const addStep = () => {
     const newStep: FormStep = {
       id: crypto.randomUUID(),
@@ -656,7 +644,6 @@ export default function FormBuilder({
     toast.success("Step deleted");
   };
 
-  // Save form to database
   const handleSaveForm = async () => {
     if (!formName.trim()) {
       toast.error("Please enter a form name");
@@ -694,9 +681,7 @@ export default function FormBuilder({
         formId ? "Form updated successfully!" : "Form created successfully!",
       );
 
-      // If creating new form, could redirect to edit mode
       if (!formId && savedForm.id) {
-        // Optionally: window.location.href = `/admin/forms/${savedForm.id}`;
       }
     } catch (error) {
       console.error("Error saving form:", error);
