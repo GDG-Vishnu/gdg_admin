@@ -87,13 +87,15 @@ export async function DELETE(
       return NextResponse.json({ error: "Form not found" }, { status: 404 });
     }
 
-    // Firestore batches are limited to 500 operations, so chunk if needed
+    // Cascade delete: remove all responses before deleting the form.
+    // Firestore batches support max 500 operations, so we process in
+    // chunks of 499 (reserving 1 slot for the form doc in the last batch).
     const responsesSnapshot = await db
       .collection("form_responses")
       .where("formId", "==", id)
       .get();
 
-    const BATCH_LIMIT = 499; // reserve 1 slot for the form doc itself in the last batch
+    const BATCH_LIMIT = 499;
     const responseDocs = responsesSnapshot.docs;
 
     for (let i = 0; i < responseDocs.length; i += BATCH_LIMIT) {
@@ -103,12 +105,14 @@ export async function DELETE(
       chunk.forEach((responseDoc) => {
         batch.delete(responseDoc.ref);
       });
+      // Include the form doc deletion in the final batch to minimize writes
       if (isLastChunk) {
         batch.delete(docRef);
       }
       await batch.commit();
     }
 
+    // If there were no responses, the form wasn't deleted in a batch above
     if (responseDocs.length === 0) {
       await docRef.delete();
     }

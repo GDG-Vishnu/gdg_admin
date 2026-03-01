@@ -45,11 +45,20 @@ type Event = {
   MembersParticipated: number;
 };
 
+/**
+ * Injects Cloudinary transform parameters into the URL to request a
+ * pre-resized image from the CDN instead of downloading the full original.
+ * Falls back to the raw URL for non-Cloudinary images.
+ */
 function cloudinaryOptimized(url: string, width: number, height: number): string {
   if (!url || !url.includes('res.cloudinary.com')) return url;
   return url.replace('/upload/', `/upload/c_fill,w_${width},h_${height},q_auto,f_auto/`);
 }
 
+/**
+ * Maps the event's Theme array (5 hex colors from Firestore) to named roles.
+ * Falls back to a default pink/red/blue palette if the event has fewer than 5 colors.
+ */
 function getThemeColors(theme: string[] | null) {
   const defaultTheme = ["#f75590", "#f75590", "#ff7eb3", "#F44336", "#3D85C6"];
   const colors = theme && theme.length >= 5 ? theme : defaultTheme;

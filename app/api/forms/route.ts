@@ -9,6 +9,8 @@ export async function GET() {
       .orderBy("createdAt", "desc")
       .get();
 
+    // For each form, run a count() aggregation on form_responses
+    // to get the response count without downloading all response docs.
     const forms = await Promise.all(
       formsSnapshot.docs.map(async (doc) => {
         const responsesSnapshot = await db

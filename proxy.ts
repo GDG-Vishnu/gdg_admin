@@ -1,104 +1,86 @@
+/**
+ * Next.js Middleware — runs on every matched request before it reaches the
+ * route handler. Performs lightweight session cookie checks for auth gating.
+ *
+ * Auth flow:
+ *  1. Allow auth endpoints and public GETs through without a session.
+ *  2. For protected routes, check if the Firebase session cookie exists.
+ *  3. If cookie is present, forward the request (API routes do full verification).
+ *  4. If cookie is missing, redirect (pages) or 401 (API).
+ *
+ * Note: Firebase Admin SDK cannot run in Edge Runtime, so we only check
+ * cookie existence here. Full session verification happens in API routes.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+
+const COOKIE_NAME = "gdg_session";
 
 const AUTH_API_ROUTES = ["/api/auth/login", "/api/auth/logout", "/api/auth/me"];
 
-// Public API routes that don't require authentication (read-only)
 const PUBLIC_API_ROUTES = ["/api/events", "/api/forms"];
 
 export async function proxy(request: NextRequest) {
-    const { pathname } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
-    if (AUTH_API_ROUTES.some((route) => pathname.startsWith(route))) {
-        return NextResponse.next();
+  // Auth endpoints always pass through
+  if (AUTH_API_ROUTES.some((route) => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // Public read-only APIs (events, forms) don't need auth
+  if (
+    PUBLIC_API_ROUTES.some((route) => pathname.startsWith(route)) &&
+    request.method === "GET"
+  ) {
+    return NextResponse.next();
+  }
+
+  // Allow unauthenticated users to submit form responses (public forms)
+  if (
+    pathname.match(/^\/api\/forms\/[^/]+\/responses$/) &&
+    request.method === "POST"
+  ) {
+    return NextResponse.next();
+  }
+
+  const isProtectedRoute = pathname.startsWith("/admin");
+  const isProtectedApi =
+    pathname.startsWith("/api/") &&
+    !AUTH_API_ROUTES.some((route) => pathname.startsWith(route));
+
+  if (!isProtectedRoute && !isProtectedApi) {
+    return NextResponse.next();
+  }
+
+  // Check for session cookie existence (lightweight, Edge-compatible)
+  const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
+
+  if (!sessionCookie) {
+    if (isProtectedApi) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
     }
+    const loginUrl = new URL("/", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
 
-    if (
-        PUBLIC_API_ROUTES.some((route) => pathname.startsWith(route)) &&
-        request.method === "GET"
-    ) {
-        return NextResponse.next();
-    }
-
-    // Allow public form response submission (POST)
-    if (
-        pathname.match(/^\/api\/forms\/[^/]+\/responses$/) &&
-        request.method === "POST"
-    ) {
-        return NextResponse.next();
-    }
-
-    const isProtectedRoute = pathname.startsWith("/admin");
-
-    const isProtectedApi =
-        pathname.startsWith("/api/") &&
-        !AUTH_API_ROUTES.some((route) => pathname.startsWith(route));
-
-    if (!isProtectedRoute && !isProtectedApi) {
-        return NextResponse.next();
-    }
-
-    const token = request.cookies.get(COOKIE_NAME)?.value;
-
-    if (!token) {
-        if (isProtectedApi) {
-            return NextResponse.json(
-                { error: "Authentication required" },
-                { status: 401 },
-            );
-        }
-        const loginUrl = new URL("/", request.url);
-        loginUrl.searchParams.set("redirect", pathname);
-        return NextResponse.redirect(loginUrl);
-    }
-
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-        const response = isProtectedApi
-            ? NextResponse.json(
-                { error: "Invalid or expired token" },
-                { status: 401 },
-            )
-            : NextResponse.redirect(new URL("/", request.url));
-
-        response.cookies.set(COOKIE_NAME, "", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-            maxAge: 0,
-        });
-
-        return response;
-    }
-
-    if (isProtectedRoute && !payload.isAdmin) {
-        return NextResponse.redirect(new URL("/", request.url));
-    }
-
-    // Attach user info to headers for downstream use
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-user-id", payload.userId);
-    requestHeaders.set("x-user-email", payload.email);
-    requestHeaders.set("x-user-name", payload.name);
-    requestHeaders.set("x-user-is-admin", String(payload.isAdmin));
-
-    return NextResponse.next({
-        request: {
-            headers: requestHeaders,
-        },
-    });
+  // Cookie exists — let the request through.
+  // Full session verification is done by individual API routes.
+  return NextResponse.next();
 }
 
+// Only run proxy on routes that need auth checks — skips static assets, _next, etc.
 export const config = {
-    matcher: [
-        "/admin/:path*",
-        "/api/admin/:path*",
-        "/api/events/:path*",
-        "/api/forms/:path*",
-        "/api/upload/:path*",
-        "/api/auth/login",
-        "/api/auth/logout",
-    ],
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/events/:path*",
+    "/api/forms/:path*",
+    "/api/upload/:path*",
+    "/api/auth/login",
+    "/api/auth/logout",
+  ],
 };

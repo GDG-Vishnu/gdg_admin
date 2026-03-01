@@ -1,9 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 import {
   Home,
   Users,
+  UsersRound,
   Calendar,
   Settings,
   BarChart3,
@@ -48,6 +51,11 @@ const menuItems = [
     icon: Calendar,
   },
   {
+    title: "Users",
+    url: "/admin/users",
+    icon: UsersRound,
+  },
+  {
     title: "Forms",
     url: "/admin/forms",
     icon: FileText,
@@ -80,7 +88,7 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      localStorage.removeItem("authToken");
+      await signOut(auth);
       router.push("/");
     } catch (error) {
       console.error("Logout failed:", error);

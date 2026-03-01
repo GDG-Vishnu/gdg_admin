@@ -167,6 +167,7 @@ export default function MembersPage() {
             {Object.entries(
               members
                 .slice()
+                // Sort: department rank first, then individual rank, then alphabetical
                 .sort((a, b) => {
                   const dra = typeof a.dept_rank === "number" ? a.dept_rank : 0;
                   const drb = typeof b.dept_rank === "number" ? b.dept_rank : 0;
@@ -222,7 +223,7 @@ export default function MembersPage() {
                   </div>
                 </div>
 
-                {/* Desktop: 3-2-3-2 pattern when >4 members, otherwise centered */}
+                {/* Desktop: alternating 3-2-3-2 row layout creates a honeycomb-like grid */}
                 <div className="hidden md:block w-full px-4">
                   {groupMembers.length > 4 ? (
                     <div className="space-y-6">

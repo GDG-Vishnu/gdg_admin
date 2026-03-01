@@ -3,6 +3,10 @@
 # local documentation files
 FIREBASE_SCHEMA.md
 
+
+# schema analysis script (local dev tool, not for production)
+scripts/analyzeSchema.ts
+
 # dependencies
 /node_modules
 /.pnp

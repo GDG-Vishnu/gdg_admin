@@ -9,6 +9,8 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
+    // Whitelist of updatable fields — prevents clients from injecting
+    // arbitrary fields (e.g., isAdmin) into the Firestore document.
     const allowedFields = [
       "name",
       "designation",

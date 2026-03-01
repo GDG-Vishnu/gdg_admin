@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 
-export const revalidate = 3600; // 1 hour
+// ISR revalidation — Next.js will cache this response for 1 hour in production
+export const revalidate = 3600;
 
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
       ...doc.data(),
     }));
 
+    // Cache at CDN/browser level: fresh for 1hr, serve stale for up to 24hr while revalidating
     return NextResponse.json(members, {
       headers: {
         "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",

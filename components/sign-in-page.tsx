@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 import GoogleLoader from "@/components/GoogleLoader";
 
 export function LoginPage() {
@@ -54,13 +56,21 @@ export function LoginPage() {
     setError(null);
 
     try {
+      // 1. Sign in with Firebase Auth client SDK
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password,
+      );
+
+      // 2. Get the ID token
+      const idToken = await userCredential.user.getIdToken();
+
+      // 3. Exchange it for a server-side session cookie
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
+        body: JSON.stringify({ idToken }),
       });
 
       const data = await res.json();
@@ -71,8 +81,18 @@ export function LoginPage() {
       }
 
       router.replace(redirectPath);
-    } catch {
-      setError("Network error. Please check your connection.");
+    } catch (err: any) {
+      // Map Firebase Auth error codes to user-friendly messages
+      const code = err?.code;
+      if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        setError("Invalid email or password.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Please try again later.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

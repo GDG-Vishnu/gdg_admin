@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // Convert the uploaded File to a base64 data URI — required by
+    // Cloudinary's upload API when not using direct file streams.
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const base64File = `data:${file.type};base64,${buffer.toString("base64")}`;
