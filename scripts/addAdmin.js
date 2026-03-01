@@ -1,62 +1,58 @@
-const { PrismaClient } = require("@prisma/client");
-const crypto = require("crypto");
+/**
+ * Standalone script to create an admin user in Firebase Authentication
+ * and set the `admin` custom claim.
+ * Run with: node scripts/addAdmin.js
+ */
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+require("dotenv/config");
 
-const prisma = new PrismaClient({
-  log: ["query", "error", "warn"],
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+};
+
+const app = initializeApp({
+  credential: cert(serviceAccount),
 });
 
-/**
- * Hash password using SHA-256
- * Note: In production, consider using bcrypt or argon2 for better security
- */
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
+const auth = getAuth(app);
 
 async function addAdmin() {
+  const email = "admin@gdgvitb.in";
+  const password = "123456";
+  const displayName = "GDG DEVS";
+
   try {
-    const adminData = {
-      email: "admin@gdgvitb.in",
-      username: "GUNA",
-      passwordHash: hashPassword("123456"),
-      firstName: "GUNA",
-      role: "ADMIN",
-      status: "ACTIVE",
-      permissions: ["*"], // Full permissions
-    };
-
-    // Check if admin already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: adminData.email },
-    });
-
-    if (existingUser) {
-      console.log(`❌ Admin with email ${adminData.email} already exists!`);
-      console.log(`User ID: ${existingUser.id}`);
-      return;
+    let user;
+    try {
+      user = await auth.getUserByEmail(email);
+      console.log(`User with email ${email} already exists (uid: ${user.uid}).`);
+    } catch {
+      user = await auth.createUser({
+        email,
+        password,
+        displayName,
+      });
+      console.log("Admin user created in Firebase Auth!");
     }
 
-    // Create the admin user
-    const admin = await prisma.user.create({
-      data: adminData,
-    });
+    // Set admin custom claim
+    await auth.setCustomUserClaims(user.uid, { admin: true });
 
-    console.log("✅ Admin user created successfully!");
     console.log("-----------------------------------");
-    console.log(`ID:       ${admin.id}`);
-    console.log(`Username: ${admin.username}`);
-    console.log(`Email:    ${admin.email}`);
-    console.log(`Role:     ${admin.role}`);
-    console.log(`Status:   ${admin.status}`);
+    console.log(`UID:   ${user.uid}`);
+    console.log(`Name:  ${displayName}`);
+    console.log(`Email: ${email}`);
     console.log("-----------------------------------");
-    console.log("\n🔑 Login Credentials:");
-    console.log(`Email:    admin@gdgvitb.in`);
-    console.log(`Password: 123456`);
+    console.log("\nLogin Credentials:");
+    console.log(`Email:    ${email}`);
+    console.log(`Password: ${password}`);
+    console.log("\nCustom claims: { admin: true }");
   } catch (error) {
-    console.error("❌ Error creating admin user:", error);
+    console.error("Error creating admin user:", error);
     throw error;
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

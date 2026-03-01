@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    // Cloudinary images are already optimized via their CDN.
+    // Skip Next.js image optimization for external URLs to avoid timeout errors.
+    unoptimized: true,
   },
 };
 

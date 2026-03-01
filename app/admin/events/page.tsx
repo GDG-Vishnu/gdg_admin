@@ -10,13 +10,16 @@ import Link from "next/link";
 import { PageHeader } from "@/components/admin/layout/PageHeader";
 import { Calendar } from "lucide-react";
 import { useEffect, useState } from "react";
+import GoogleLoader from "@/components/GoogleLoader";
 
 export default function EventsPage() {
   const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/admin/events")
       .then((res) => res.json())
-      .then((data) => setEvents(data));
+      .then((data) => setEvents(data))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -32,7 +35,9 @@ export default function EventsPage() {
           </p>
         </div>
         <div className="flex flex-col gap-6">
-          {events.length === 0 ? (
+          {loading ? (
+            <GoogleLoader message="Loading events..." />
+          ) : events.length === 0 ? (
             <Card className="flex items-center justify-center p-12 bg-muted/20 border-dashed">
               <div className="text-center">
                 <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
@@ -44,11 +49,10 @@ export default function EventsPage() {
             events.map((event: any) => (
               <Link key={event.id} href={`/admin/events/${event.id}`}>
                 <Card
-                  className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none bg-gradient-to-r from-white to-slate-50/50 shadow-md cursor-pointer"
+                  className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none bg-gradient-to-r from-white to-slate-50/50 shadow-md cursor-pointer p-3"
                 >
-                <div className="flex flex-col md:flex-row min-h-[160px]">
-                  {/* Left Section: Image/Visual */}
-                  <div className="relative w-full md:w-64 h-48 md:h-auto overflow-hidden">
+                <div className="flex flex-col md:flex-row min-h-[180px]">
+                  <div className="relative w-full md:w-60 h-48 md:h-auto overflow-hidden rounded-xl flex-shrink-0">
                     {event.imageUrl ? (
                       <img
                         src={event.imageUrl}
@@ -60,7 +64,7 @@ export default function EventsPage() {
                         <Calendar className="h-12 w-12 text-blue-500/40" />
                       </div>
                     )}
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-3 left-3">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${
                         event.status === 'upcoming' ? 'bg-green-500 text-white' : 
                         event.status === 'ongoing' ? 'bg-blue-500 text-white' : 
@@ -71,8 +75,7 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  {/* Right Section: Details */}
-                  <div className="flex-1 p-6 md:p-8 flex flex-col justify-between">
+                  <div className="flex-1 px-5 py-3 md:px-6 md:py-2 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <CardTitle className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">

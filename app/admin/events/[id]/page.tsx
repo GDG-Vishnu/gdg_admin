@@ -45,16 +45,29 @@ type Event = {
   MembersParticipated: number;
 };
 
-// Theme color helper - extracts colors from event Theme array
+/**
+ * Injects Cloudinary transform parameters into the URL to request a
+ * pre-resized image from the CDN instead of downloading the full original.
+ * Falls back to the raw URL for non-Cloudinary images.
+ */
+function cloudinaryOptimized(url: string, width: number, height: number): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/c_fill,w_${width},h_${height},q_auto,f_auto/`);
+}
+
+/**
+ * Maps the event's Theme array (5 hex colors from Firestore) to named roles.
+ * Falls back to a default pink/red/blue palette if the event has fewer than 5 colors.
+ */
 function getThemeColors(theme: string[] | null) {
   const defaultTheme = ["#f75590", "#f75590", "#ff7eb3", "#F44336", "#3D85C6"];
   const colors = theme && theme.length >= 5 ? theme : defaultTheme;
   return {
-    primary: colors[0], // Main accent color
-    secondary: colors[1], // Secondary accent
-    accent: colors[2], // Lighter accent
-    highlight: colors[3], // Highlight color
-    bgAccent: colors[4], // Background accent
+    primary: colors[0],
+    secondary: colors[1],
+    accent: colors[2],
+    highlight: colors[3],
+    bgAccent: colors[4],
   };
 }
 
@@ -170,7 +183,6 @@ export default function EventDetailPage() {
     statusColors[event.status || ""] ||
     "bg-gray-100 text-gray-800 border-gray-200";
 
-  // Get theme colors from event
   const theme = getThemeColors(event.Theme);
 
   return (
@@ -185,7 +197,6 @@ export default function EventDetailPage() {
     >
       <main className="py-8 px-4">
         <div className="max-w-7xl mx-auto">
-          {/* Event Image Banner */}
           {(event.coverUrl || event.imageUrl) && (
             <div
               className="w-full mb-6 rounded-2xl overflow-hidden shadow-lg relative"
@@ -197,12 +208,11 @@ export default function EventDetailPage() {
                 </div>
               )}
               <picture>
-                {/* Desktop image (≥1024px) */}
+
                 {event.coverUrl && (
                   <source media="(min-width: 1024px)" srcSet={event.coverUrl} />
                 )}
 
-                {/* Mobile image (<1024px) */}
                 <img
                   src={event.imageUrl || event.coverUrl || ""}
                   alt={event.title}
@@ -244,7 +254,6 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {/* Event Gallery Section */}
         {event.eventGallery && event.eventGallery.length > 0 && (
           <div className="max-w-7xl mx-auto mt-8">
             <div className="relative z-10 flex justify-center mb-6 flex-col items-center">
@@ -257,7 +266,6 @@ export default function EventDetailPage() {
                 </h1>
                 <Camera className="w-7 h-7 text-stone-900" />
 
-                {/* Connection line to next section */}
                 <div
                   className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-1 h-6 rounded-full"
                   style={{ background: theme.primary }}
@@ -276,10 +284,11 @@ export default function EventDetailPage() {
                   }}
                 >
                   <Image
-                    src={imageUrl}
+                    src={cloudinaryOptimized(imageUrl, 800, 600)}
                     alt={`${event.title} Gallery ${index + 1}`}
                     width={400}
                     height={300}
+                    loading="lazy"
                     className="w-full h-60 object-cover"
                   />
                 </div>
@@ -307,12 +316,11 @@ export default function EventDetailPage() {
               aria-hidden
               className="absolute inset-0"
               style={{
-                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
-                backgroundSize: "20px 20px, 40px 40px",
-                backgroundPosition: "0 0, 10px 10px",
-                opacity: 1,
+                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)`,
+                backgroundSize: "20px 20px",
                 pointerEvents: "none",
                 borderRadius: 28,
+                willChange: "transform",
               }}
             />
 
@@ -329,12 +337,12 @@ export default function EventDetailPage() {
                 <img
                   src="https://res.cloudinary.com/duvr3z2z0/image/upload/v1764655440/Group_6_mczuk3.png"
                   alt=""
+                  loading="lazy"
                 />
               </div>
             </div>
           </div>
         </div>
-        {/*     <BentoGrid tiles={tiles} */}
 
         <div className="max-w-7xl mx-auto rounded-[32px] overflow-hidden bg-[#111111] px-6 md:px-12 lg:px-20 py-8 md:py-14 mt-4">
           <div className="relative rounded-[32px]">
@@ -342,17 +350,15 @@ export default function EventDetailPage() {
               aria-hidden
               className="absolute inset-0"
               style={{
-                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
-                backgroundSize: "20px 20px, 40px 40px",
-                backgroundPosition: "0 0, 10px 10px",
-                opacity: 1,
+                backgroundImage: `radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)`,
+                backgroundSize: "20px 20px",
                 pointerEvents: "none",
                 borderRadius: 28,
+                willChange: "transform",
               }}
             />
 
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Half - Key Highlights */}
               {event.keyHighlights && event.keyHighlights.length > 0 && (
                 <div>
                   <div className="flex items-center mb-6">
@@ -366,8 +372,8 @@ export default function EventDetailPage() {
                     {event.keyHighlights.map((highlight, index) => (
                       <div
                         key={index}
-                        className="flex items-start gap-4 p-4 bg-[#1a1a1a] rounded-2xl border border-stone-800 transition-colors"
-                        style={{ borderColor: "transparent" }}
+                        className="flex items-start gap-4 p-4 bg-[#1a1a1a] rounded-2xl border border-transparent transition-colors"
+                        style={{ ['--hover-border' as string]: theme.primary } as React.CSSProperties}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.borderColor = theme.primary)
                         }
@@ -390,9 +396,7 @@ export default function EventDetailPage() {
                 </div>
               )}
 
-              {/* Right Half - Organizers + Tags */}
               <div className="flex flex-col gap-8">
-                {/* Organizers */}
                 {(event.organizer || event.coOrganizer) && (
                   <div>
                     <div className="flex items-center mb-6">
@@ -441,7 +445,6 @@ export default function EventDetailPage() {
                   </div>
                 )}
 
-                {/* Tags */}
                 {event.tags && event.tags.length > 0 && (
                   <div>
                     <div className="flex items-center mb-6">
@@ -476,7 +479,6 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {/* Register / CTA Section */}
         <div
           className="max-w-7xl mx-auto rounded-[32px] overflow-hidden px-6 md:px-12 lg:px-20 py-10 md:py-16 mt-4 mb-8"
           style={{
@@ -500,7 +502,7 @@ export default function EventDetailPage() {
                 )}
                 <Link
                   href="/admin/events"
-                  className="px-8 py-4 bg-white/20 text-white rounded-full text-lg font-semibold hover:bg-white/30 transition-colors flex items-center gap-2 backdrop-blur-sm"
+                  className="px-8 py-4 bg-white/20 text-white rounded-full text-lg font-semibold hover:bg-white/30 transition-colors flex items-center gap-2"
                 >
                   <ArrowLeft className="w-5 h-5" />
                   View All Events
@@ -538,7 +540,6 @@ function ParticipantBadge({
       {/* Colored circle with icon */}
       <div
         className="flex-shrink-0 flex justify-center items-center rounded-full m-1"
-        // responsive sizes: w-10 h-10 on mobile, w-11 h-11 on md+
         style={{
           width: 40, // keeps exact pixel width if you prefer; could replace with className "w-10 h-10 md:w-11 md:h-11"
           height: 40,
@@ -558,7 +559,6 @@ function ParticipantBadge({
       {/* Count text */}
       <span
         className="text-white font-semibold ml-3 md:ml-4 truncate"
-        // responsive font-size: text-lg on mobile, text-2xl from md up
         style={{ fontSize: 18 }}
       >
         {text}

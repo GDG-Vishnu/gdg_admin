@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
 
 export async function PATCH(
   request: NextRequest,
@@ -9,7 +9,8 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Only allow updating these fields
+    // Whitelist of updatable fields — prevents clients from injecting
+    // arbitrary fields (e.g., isAdmin) into the Firestore document.
     const allowedFields = [
       "name",
       "designation",
@@ -38,19 +39,25 @@ export async function PATCH(
       );
     }
 
-    const updated = await prisma.teamMember.update({
-      where: { id },
-      data,
-    });
+    const docRef = db.collection("team_members").doc(id);
+    const doc = await docRef.get();
 
-    return NextResponse.json(updated);
+    if (!doc.exists) {
+      return NextResponse.json(
+        { error: "Member not found" },
+        { status: 404 },
+      );
+    }
+
+    await docRef.update(data);
+
+    const updatedDoc = await docRef.get();
+    return NextResponse.json({ id: updatedDoc.id, ...updatedDoc.data() });
   } catch (err: unknown) {
     console.error("Update member error:", err);
-    const message =
-      err instanceof Error && err.message.includes("Record to update not found")
-        ? "Member not found"
-        : "Failed to update member";
-    const status = message === "Member not found" ? 404 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json(
+      { error: "Failed to update member" },
+      { status: 500 },
+    );
   }
 }

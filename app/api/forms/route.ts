@@ -1,17 +1,31 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
+import { FieldValue } from "firebase-admin/firestore";
 
-// GET all forms
 export async function GET() {
   try {
-    const forms = await prisma.form.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        _count: {
-          select: { responses: true },
-        },
-      },
-    });
+    const formsSnapshot = await db
+      .collection("forms")
+      .orderBy("createdAt", "desc")
+      .get();
+
+    // For each form, run a count() aggregation on form_responses
+    // to get the response count without downloading all response docs.
+    const forms = await Promise.all(
+      formsSnapshot.docs.map(async (doc) => {
+        const responsesSnapshot = await db
+          .collection("form_responses")
+          .where("formId", "==", doc.id)
+          .count()
+          .get();
+
+        return {
+          id: doc.id,
+          ...doc.data(),
+          responseCount: responsesSnapshot.data().count,
+        };
+      }),
+    );
 
     return NextResponse.json(forms);
   } catch (error) {
@@ -23,7 +37,6 @@ export async function GET() {
   }
 }
 
-// POST create a new form
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -36,17 +49,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const form = await prisma.form.create({
-      data: {
-        title,
-        description: description || "",
-        fields,
-        steps: steps || null,
-        isActive: isActive !== undefined ? isActive : true,
-      },
+    const now = FieldValue.serverTimestamp();
+    const docRef = await db.collection("forms").add({
+      title,
+      description: description || "",
+      fields,
+      steps: steps || null,
+      isActive: isActive !== undefined ? isActive : true,
+      createdAt: now,
+      updatedAt: now,
     });
 
-    return NextResponse.json(form, { status: 201 });
+    const createdDoc = await docRef.get();
+    return NextResponse.json(
+      { id: createdDoc.id, ...createdDoc.data() },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Error creating form:", error);
     return NextResponse.json(

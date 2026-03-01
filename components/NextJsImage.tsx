@@ -1,3 +1,8 @@
+/**
+ * Custom slide renderer for yet-another-react-lightbox that uses Next.js <Image>
+ * instead of a plain <img>. This enables Cloudinary pass-through optimization
+ * and consistent image handling throughout the app.
+ */
 import Image, { StaticImageData } from "next/image";
 import {
   isImageFitCover,
@@ -13,6 +18,7 @@ function isNextJsImage(slide: Slide): slide is Slide & { image: string | StaticI
 export default function NextJsImage({ slide, offset, rect }: RenderSlideProps) {
   if (!isNextJsImage(slide)) return null;
 
+  // Clamp to the smaller of the lightbox viewport and the image's native dimensions
   const width = !rect.width ? rect.width: Math.min(rect.width, (slide.width || rect.width));
   const height = !rect.height ? rect.height : Math.min(rect.height, (slide.height || rect.height));
 

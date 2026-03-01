@@ -18,8 +18,8 @@ GDG Admin Portal is a full-stack web application designed to streamline the mana
 
 ## Technology Stack
 
-- **Framework**: Next.js 14+ (App Router)
-- **Database**: PostgreSQL with Prisma ORM
+- **Framework**: Next.js 16+ (App Router)
+- **Database**: Firebase Firestore
 - **Media Storage**: Cloudinary
 - **UI Components**: shadcn/ui with Tailwind CSS
 - **Authentication**: Custom session-based auth
@@ -37,13 +37,53 @@ GDG Admin Portal is a full-stack web application designed to streamline the mana
 │   ├── ui/               # Reusable UI components
 │   └── forms/            # Form components
 ├── lib/                   # Utility functions and services
-├── prisma/               # Database schema and migrations
+│   └── firebase.ts       # Firebase Admin SDK configuration
 └── types/                # TypeScript type definitions
+```
+
+## Environment Variables
+
+Add the following to your `.env` file:
+
+```env
+# Firebase Admin SDK
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=your-service-account@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
 ```
 
 ## Getting Started
 
-Refer to [PRISMA_SETUP.md](PRISMA_SETUP.md) and [CLOUDINARY_SETUP.md](CLOUDINARY_SETUP.md) for detailed setup instructions.
+1. Set up your Firebase project and Firestore database
+2. Generate a service account key from Firebase Console → Project Settings → Service Accounts
+3. Copy the credentials to your `.env` file
+4. Refer to [CLOUDINARY_SETUP.md](CLOUDINARY_SETUP.md) for Cloudinary setup
+
+## Firestore Collections
+
+| Collection         | Description                          |
+|--------------------|--------------------------------------|
+| `events`           | Community events                     |
+| `team_members`     | Team member profiles                 |
+| `gallery`          | Gallery images                       |
+| `users`            | Admin users                          |
+| `forms`            | Dynamic forms                        |
+| `form_responses`   | Submitted form responses             |
+
+## Available Scripts
+
+| Script              | Description                                |
+|---------------------|--------------------------------------------|
+| `npm run dev`       | Start development server                   |
+| `npm run build`     | Build for production                       |
+| `npm run add-admin` | Seed an admin user into Firestore          |
+| `npm run seed-user` | Seed a dev user into Firestore             |
+| `npm run db:verify` | Verify Firestore collections are accessible|
 
 ---
 

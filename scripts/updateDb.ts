@@ -1,31 +1,45 @@
 import "dotenv/config";
-import { execSync } from "child_process";
+import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
-const dbUrl = process.env.DATABASE_URL;
+const serviceAccount: ServiceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+};
 
-if (!dbUrl) {
-  console.error("❌ DATABASE_URL environment variable is not set");
-  process.exit(1);
+const app = initializeApp({
+  credential: cert(serviceAccount),
+});
+
+const db = getFirestore(app);
+
+const REQUIRED_COLLECTIONS = [
+  "events",
+  "team_members",
+  "gallery",
+  "users",
+  "forms",
+  "form_responses",
+];
+
+async function verifyCollections() {
+  console.log("Verifying Firestore collections...\n");
+
+  for (const collectionName of REQUIRED_COLLECTIONS) {
+    const snapshot = await db.collection(collectionName).limit(1).get();
+    const status = snapshot.empty ? "EMPTY" : "OK";
+    const icon = snapshot.empty ? "⚠" : "✓";
+    console.log(`  ${icon} ${collectionName}: ${status}`);
+  }
+
+  console.log("\nFirestore verification complete!");
+  console.log(
+    "Note: Empty collections are created automatically when the first document is added.",
+  );
 }
 
-console.log("✓ DATABASE_URL found");
-console.log("\nPushing schema to database...\n");
-
-try {
-  execSync(`npx prisma db push --url="${dbUrl}"`, {
-    stdio: "inherit",
-  });
-
-  console.log("\n✅ Database schema updated successfully!");
-
-  // Generate Prisma client
-  console.log("\nGenerating Prisma client...\n");
-  execSync("npx prisma generate", {
-    stdio: "inherit",
-  });
-
-  console.log("\n✅ Prisma client generated!");
-} catch (error) {
-  console.error("\n❌ Error updating database schema");
+verifyCollections().catch((error) => {
+  console.error("Error verifying Firestore:", error);
   process.exit(1);
-}
+});

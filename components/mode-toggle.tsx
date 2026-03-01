@@ -58,7 +58,6 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
   );
 }
 
-// Legacy components for backward compatibility
 export const ModeToggle = ThemeToggle;
 
 export function ThemeToggleSwitch() {

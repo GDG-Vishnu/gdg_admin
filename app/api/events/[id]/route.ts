@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase";
+import { normalizeEventData } from "@/lib/normalize";
 
 export async function GET(
   request: Request,
@@ -7,15 +8,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const event = await prisma.events.findUnique({
-      where: { id },
-    });
+    const docRef = db.collection("events").doc(id);
+    const doc = await docRef.get();
 
-    if (!event) {
+    if (!doc.exists) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    return NextResponse.json(event);
+    return NextResponse.json(
+      normalizeEventData({ ...doc.data(), id: doc.id }),
+    );
   } catch (error) {
     console.error("Error fetching event:", error);
     return NextResponse.json(

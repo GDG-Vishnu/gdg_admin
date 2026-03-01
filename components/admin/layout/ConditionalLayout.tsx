@@ -4,6 +4,10 @@ import { usePathname } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/admin/layout/app-sidebar";
 
+/**
+ * Wraps admin pages with the sidebar layout.
+ * The login page ("/") renders without the sidebar.
+ */
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/";

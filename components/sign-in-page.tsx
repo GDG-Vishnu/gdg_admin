@@ -1,16 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
+import GoogleLoader from "@/components/GoogleLoader";
 
 export function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectPath = searchParams.get("redirect") || "/admin/dashboard";
+
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
   });
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated) {
+            router.replace(redirectPath);
+            return;
+          }
+        }
+      } catch {
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    }
+    checkAuth();
+  }, [router, redirectPath]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -18,26 +47,68 @@ export function LoginPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    if (error) setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login submitted:", formData);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // 1. Sign in with Firebase Auth client SDK
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password,
+      );
+
+      // 2. Get the ID token
+      const idToken = await userCredential.user.getIdToken();
+
+      // 3. Exchange it for a server-side session cookie
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setError(data.error || "Login failed. Please try again.");
+        return;
+      }
+
+      router.replace(redirectPath);
+    } catch (err: any) {
+      // Map Firebase Auth error codes to user-friendly messages
+      const code = err?.code;
+      if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        setError("Invalid email or password.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Please try again later.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
+        <GoogleLoader size={14} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex">
-      {/* Left Panel - Image Section */}
-      <div className="flex-1 relative overflow-hidden">
-        {/* Back Button */}
-        <div className="absolute top-6 left-6 z-10">
-          <Link href="/" legacyBehavior>
-            <a className="w-10 h-10 bg-black/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-black/30 transition-all">
-              <ArrowLeft className="w-5 h-5 text-white" />
-            </a>
-          </Link>
-        </div>
-
+      <div className="flex-1 relative overflow-hidden hidden md:block">
         <div className="absolute inset-0">
           <img
             src="https://i.ibb.co/dJxBbFks/brandasset.png"
@@ -47,7 +118,6 @@ export function LoginPage() {
         </div>
       </div>
 
-      {/* Right Panel - Form Section */}
       <div className="flex-1 flex items-center justify-center bg-white">
         <div className="w-full max-w-md p-8">
           <div className="mb-8">
@@ -55,18 +125,18 @@ export function LoginPage() {
               Welcome Back
             </h1>
             <p className="text-gray-600">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" legacyBehavior>
-                <a className="text-blue-600 hover:text-blue-700 font-medium">
-                  Sign up
-                </a>
-              </Link>
+              Sign in to access the admin dashboard.
             </p>
           </div>
 
-          {/* Form */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -77,12 +147,13 @@ export function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="Email Address"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 required
+                disabled={isLoading}
+                autoComplete="email"
               />
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password
@@ -94,13 +165,16 @@ export function LoginPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Password"
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                   required
+                  disabled={isLoading}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
+                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5 text-gray-500" />
@@ -111,8 +185,7 @@ export function LoginPage() {
               </div>
             </div>
 
-            {/* Remember Me + Forgot Password */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <label className="flex items-center space-x-2 text-sm text-gray-600">
                 <input
                   type="checkbox"
@@ -120,31 +193,26 @@ export function LoginPage() {
                   checked={formData.rememberMe}
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+                  disabled={isLoading}
                 />
                 <span>Remember me</span>
               </label>
-              <button
-                type="button"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Forgot password?
-              </button>
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
-              className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-800 transition-colors"
+              disabled={isLoading}
+              className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Sign In
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
-
-            {/* Dashboard Button */}
-            <Link href="/admin/dashboard" legacyBehavior>
-              <a className="w-full block mt-2 bg-blue-600 text-white py-3 px-4 rounded-xl font-medium text-center hover:bg-blue-700 transition-colors">
-                Dashboard
-              </a>
-            </Link>
           </form>
         </div>
       </div>

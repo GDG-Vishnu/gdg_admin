@@ -41,7 +41,6 @@ export default function SettingsPage() {
     <div className="flex flex-col">
       <PageHeader title="Settings" />
 
-      {/* Main Content */}
       <div className="flex-1 space-y-6 p-6">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
@@ -52,7 +51,6 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
@@ -75,7 +73,6 @@ export default function SettingsPage() {
           })}
         </div>
 
-        {/* Settings Sections */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
           <Card className="col-span-4">
             <CardHeader>

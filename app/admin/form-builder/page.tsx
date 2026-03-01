@@ -97,7 +97,6 @@ const FIELD_TYPES = [
   { type: "file", label: "File Upload", icon: Upload },
 ] as const;
 
-// Mock database of forms
 const MOCK_FORMS: Record<string, FormConfig> = {
   "1": {
     title: "Cloud Study Jam 2025 - GDG VITB",
@@ -354,11 +353,8 @@ export default function FormBuilderPage() {
 
       if (response.ok) {
         const data = await response.json();
-        // Optionally redirect or show success message
-        console.log("Form saved successfully:", data);
         alert(`Form ${publish ? "published" : "saved"} successfully!`);
         if (!formId && data.id) {
-          // Redirect to edit mode with the new form ID
           window.history.pushState({}, "", `/admin/form-builder?id=${data.id}`);
         }
       } else {
