@@ -42,6 +42,10 @@ import {
   ShieldBan,
   ShieldCheck,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import GoogleLoader from "@/components/GoogleLoader";
 
@@ -78,6 +82,10 @@ export default function ClientUsersPage() {
   const [filterBranch, setFilterBranch] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<ClientUser | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchUsers();
@@ -139,6 +147,16 @@ export default function ClientUsersPage() {
       filterBranch === "all" || user.branch === filterBranch;
     return matchesSearch && matchesStatus && matchesBranch;
   });
+
+  // Pagination derived values
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / rowsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedUsers = filteredUsers.slice(
+    (safeCurrentPage - 1) * rowsPerPage,
+    safeCurrentPage * rowsPerPage,
+  );
+  const startIndex = (safeCurrentPage - 1) * rowsPerPage + 1;
+  const endIndex = Math.min(safeCurrentPage * rowsPerPage, filteredUsers.length);
 
   const stats = [
     {
@@ -209,11 +227,11 @@ export default function ClientUsersPage() {
             <Input
               placeholder="Search by name, email, phone, or branch..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               className="pl-9"
             />
           </div>
-          <Select value={filterStatus} onValueChange={(v: any) => setFilterStatus(v)}>
+          <Select value={filterStatus} onValueChange={(v: any) => { setFilterStatus(v); setCurrentPage(1); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -223,7 +241,7 @@ export default function ClientUsersPage() {
               <SelectItem value="blocked">Blocked</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterBranch} onValueChange={setFilterBranch}>
+          <Select value={filterBranch} onValueChange={(v) => { setFilterBranch(v); setCurrentPage(1); }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Branch" />
             </SelectTrigger>
@@ -276,7 +294,7 @@ export default function ClientUsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
+                  {paginatedUsers.map((user) => (
                     <TableRow key={user.id} className="group cursor-pointer" onClick={() => setSelectedUser(user)}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -360,8 +378,67 @@ export default function ClientUsersPage() {
                 </TableBody>
               </Table>
             </CardContent>
-            <div className="px-6 py-3 border-t text-sm text-muted-foreground">
-              Showing {filteredUsers.length} of {users.length} users
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between px-6 py-3 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Rows per page</span>
+                <Select value={String(rowsPerPage)} onValueChange={(v) => { setRowsPerPage(Number(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 20, 30, 50, 100].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-6">
+                <span className="text-sm text-muted-foreground">
+                  {filteredUsers.length === 0 ? "0 results" : `${startIndex}–${endIndex} of ${filteredUsers.length}`}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safeCurrentPage <= 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium min-w-[80px] text-center">
+                    Page {safeCurrentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage >= totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safeCurrentPage >= totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         )}

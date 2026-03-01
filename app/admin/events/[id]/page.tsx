@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Footer from "@/components/footer/Footer";
@@ -91,7 +91,6 @@ const EventClosed = [
 
 export default function EventDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -196,6 +195,15 @@ export default function EventDetailPage() {
       }}
     >
       <main className="py-8 px-4">
+        <div className="max-w-7xl mx-auto mb-6">
+          <Link
+            href="/admin/events"
+            className="flex items-center gap-2 text-sm text-stone-600 hover:text-stone-900 transition-colors w-fit"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Events
+          </Link>
+        </div>
         <div className="max-w-7xl mx-auto">
           {(event.coverUrl || event.imageUrl) && (
             <div
@@ -566,3 +574,5 @@ function ParticipantBadge({
     </div>
   );
 }
+
+

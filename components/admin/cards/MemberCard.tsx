@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Mail, Linkedin, Pencil, X, Loader2, Save } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Mail, Linkedin, Pencil, X, Loader2, Save, Trash2, Upload } from "lucide-react";
 
 export type MemberCardProps = {
   bgColor?: string | null;
@@ -18,6 +18,11 @@ export type MemberCardProps = {
   mail?: string | null;
 };
 
+type MemberCardComponentProps = MemberCardProps & {
+  onDelete?: (id: string) => void;
+  onUpdate?: () => void;
+};
+
 export default function MemberCard({
   id,
   imageUrl,
@@ -30,11 +35,17 @@ export default function MemberCard({
   bgColor,
   rank,
   dept_rank,
-}: MemberCardProps) {
+  onDelete,
+  onUpdate,
+}: MemberCardComponentProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: name || "",
@@ -62,6 +73,7 @@ export default function MemberCard({
     });
     setSaved(false);
     setError(null);
+    setConfirmDelete(false);
     setEditOpen(true);
   }
 
@@ -80,7 +92,11 @@ export default function MemberCard({
         setError(data.error || "Update failed");
       } else {
         setSaved(true);
-        setTimeout(() => window.location.reload(), 800);
+        setTimeout(() => {
+          setEditOpen(false);
+          if (onUpdate) onUpdate();
+          else window.location.reload();
+        }, 800);
       }
     } catch {
       setError("Network error");
@@ -91,6 +107,48 @@ export default function MemberCard({
 
   function handleChange(field: string, value: string | number) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleImageUpload(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Upload failed");
+      } else {
+        handleChange("imageUrl", data.url);
+      }
+    } catch {
+      setError("Image upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Delete failed");
+      } else {
+        setEditOpen(false);
+        if (onDelete) onDelete(id);
+        else window.location.reload();
+      }
+    } catch {
+      setError("Network error");
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -205,26 +263,39 @@ export default function MemberCard({
                 />
                 <div className="w-full">
                   <label className="text-xs font-medium text-stone-600">
-                    Image URL
+                    Photo
                   </label>
                   <input
-                    type="text"
-                    value={form.imageUrl}
-                    onChange={(e) => handleChange("imageUrl", e.target.value)}
-                    className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md bg-white/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://..."
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file);
+                    }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-stone-300 rounded-md bg-white/80 hover:bg-white transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    {uploading ? "Uploading..." : "Upload Photo"}
+                  </button>
                 </div>
               </div>
 
               {/* Right: Editable fields */}
               <div className="md:w-1/2 p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-stone-900">
-                    Edit Member
-                  </h2>
-                  <span className="text-xs text-stone-400 font-mono">{id}</span>
-                </div>
+                <h2 className="text-xl font-bold text-stone-900">
+                  Edit Member
+                </h2>
 
                 <div className="space-y-3">
                   <Field
@@ -313,11 +384,11 @@ export default function MemberCard({
                   </div>
                 </div>
 
-                {/* Status + Save */}
+                {/* Status + Save + Delete */}
                 <div className="pt-2 flex items-center gap-3">
                   <button
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || deleting}
                     className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-md hover:bg-stone-800 disabled:opacity-50 text-sm font-medium"
                   >
                     {saving ? (
@@ -327,6 +398,39 @@ export default function MemberCard({
                     )}
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
+
+                  {!confirmDelete ? (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={saving || deleting}
+                      className="flex items-center gap-2 px-4 py-2 border border-stone-300 text-stone-700 rounded-md hover:bg-stone-100 disabled:opacity-50 text-sm font-medium"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                      >
+                        {deleting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                        {deleting ? "Deleting..." : "Confirm Delete"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        disabled={deleting}
+                        className="px-3 py-2 text-sm text-stone-600 hover:text-stone-900"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                   {saved && (
                     <span className="text-green-600 text-sm font-medium">
                       Saved!
