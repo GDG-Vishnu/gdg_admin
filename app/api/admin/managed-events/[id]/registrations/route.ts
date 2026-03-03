@@ -27,7 +27,7 @@ export async function GET(
       .get();
 
     const registrations = snapshot.docs.map((doc) => ({
-      id: doc.id,
+      regId: doc.id,
       ...doc.data(),
     }));
 

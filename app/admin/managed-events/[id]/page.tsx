@@ -123,11 +123,20 @@ export default function ManagedEventDetailPage() {
   const [showAddReg, setShowAddReg] = useState(false);
   const [addingReg, setAddingReg] = useState(false);
   const [regForm, setRegForm] = useState({
+    userId: "",
     name: "",
     email: "",
     phone: "",
     registrationType: "Individual" as RegistrationType,
   });
+
+  // User search for manual registration
+  const [allClientUsers, setAllClientUsers] = useState<
+    { id: string; name: string; email: string; phoneNumber: string; branch: string; profileUrl: string }[]
+  >([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; email: string; phoneNumber: string; branch: string; profileUrl: string } | null>(null);
 
   // Search
   const [search, setSearch] = useState("");
@@ -178,8 +187,32 @@ export default function ManagedEventDetailPage() {
     fetchRegistrations();
   }, [fetchEvent, fetchRegistrations]);
 
+  // Fetch client users when add-reg dialog opens
+  useEffect(() => {
+    if (!showAddReg || allClientUsers.length > 0) return;
+    setLoadingUsers(true);
+    fetch("/api/admin/users")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setAllClientUsers(data);
+      })
+      .catch(() => console.error("Failed to load users"))
+      .finally(() => setLoadingUsers(false));
+  }, [showAddReg, allClientUsers.length]);
+
+  // Filter users by search query, exclude already-registered emails
+  const registeredEmails = new Set(registrations.map((r) => r.email.toLowerCase()));
+  const filteredUsers = userSearchQuery.trim().length >= 2
+    ? allClientUsers.filter(
+        (u) =>
+          !registeredEmails.has(u.email.toLowerCase()) &&
+          (u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+            u.email.toLowerCase().includes(userSearchQuery.toLowerCase()))
+      )
+    : [];
+
   async function handleAddRegistration() {
-    if (!regForm.name.trim() || !regForm.email.trim()) return;
+    if (!selectedUser) return;
     setAddingReg(true);
     try {
       const res = await fetch(
@@ -187,12 +220,21 @@ export default function ManagedEventDetailPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(regForm),
+          body: JSON.stringify({
+            userId: selectedUser.id,
+            name: selectedUser.name,
+            email: selectedUser.email,
+            phone: selectedUser.phoneNumber || "",
+            registrationType: regForm.registrationType,
+          }),
         },
       );
       if (res.ok) {
         setShowAddReg(false);
+        setSelectedUser(null);
+        setUserSearchQuery("");
         setRegForm({
+          userId: "",
           name: "",
           email: "",
           phone: "",
@@ -650,8 +692,8 @@ export default function ManagedEventDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRegs.map((reg) => (
-                        <TableRow key={reg.regId} className="text-sm">
+                      {filteredRegs.map((reg, idx) => (
+                        <TableRow key={reg.regId || `reg-${idx}`} className="text-sm">
                           <TableCell className="font-medium py-2.5">{reg.name}</TableCell>
                           <TableCell className="text-muted-foreground py-2.5">{reg.email}</TableCell>
                           <TableCell className="text-muted-foreground py-2.5 font-mono text-xs">
@@ -710,41 +752,145 @@ export default function ManagedEventDetailPage() {
       </div>
 
       {/* Add Registration Dialog */}
-      <Dialog open={showAddReg} onOpenChange={setShowAddReg}>
-        <DialogContent className="bg-background">
-          <DialogHeader>
-            <DialogTitle>Add Registration</DialogTitle>
-            <DialogDescription>Manually register a member for this event.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="regName">Name *</Label>
-              <Input id="regName" value={regForm.name} onChange={(e) => setRegForm((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="regEmail">Email *</Label>
-              <Input id="regEmail" type="email" value={regForm.email} onChange={(e) => setRegForm((p) => ({ ...p, email: e.target.value }))} placeholder="email@example.com" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="regPhone">Phone</Label>
-              <Input id="regPhone" value={regForm.phone} onChange={(e) => setRegForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Phone number" />
-            </div>
-            <div className="space-y-2">
-              <Label>Registration Type</Label>
-              <Select value={regForm.registrationType} onValueChange={(v) => setRegForm((p) => ({ ...p, registrationType: v as RegistrationType }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Individual">Individual</SelectItem>
-                  <SelectItem value="Team">Team</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <Dialog open={showAddReg} onOpenChange={(open) => {
+        setShowAddReg(open);
+        if (!open) { setSelectedUser(null); setUserSearchQuery(""); }
+      }}>
+        <DialogContent className="sm:max-w-[440px] p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">Add Registration</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Search and select a user from the system to register.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={() => setShowAddReg(false)}>Cancel</Button>
-            <Button onClick={handleAddRegistration} disabled={addingReg || !regForm.name.trim() || !regForm.email.trim()}>
-              {addingReg ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-              Add
+
+          {/* Body */}
+          <div className="px-6 pb-2">
+            {selectedUser ? (
+              /* ── Selected user card ── */
+              <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-border bg-muted/40">
+                <div className="shrink-0 w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-xs font-bold text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20">
+                  {selectedUser.name?.charAt(0)?.toUpperCase() || "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium leading-tight truncate">{selectedUser.name}</p>
+                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">{selectedUser.email}</p>
+                </div>
+                {selectedUser.branch && (
+                  <span className="shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full bg-muted text-muted-foreground border border-border">
+                    {selectedUser.branch}
+                  </span>
+                )}
+                <button
+                  onClick={() => { setSelectedUser(null); setUserSearchQuery(""); }}
+                  className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors"
+                  title="Change user"
+                >
+                  <XCircle className="w-4 h-4 text-muted-foreground/60 hover:text-foreground" />
+                </button>
+              </div>
+            ) : (
+              /* ── Search + results ── */
+              <div className="space-y-3">
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60" />
+                  <Input
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Search by name or email…"
+                    className="pl-9 h-9 text-sm"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Results list */}
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <div className="max-h-[220px] overflow-y-auto divide-y divide-border">
+                    {loadingUsers ? (
+                      <div className="flex items-center justify-center gap-2 py-8">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Loading users…</span>
+                      </div>
+                    ) : userSearchQuery.trim().length < 2 ? (
+                      <div className="flex flex-col items-center justify-center py-8 gap-1">
+                        <Search className="w-5 h-5 text-muted-foreground/30" />
+                        <span className="text-xs text-muted-foreground/60">Type at least 2 characters to search</span>
+                      </div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 gap-1">
+                        <Users className="w-5 h-5 text-muted-foreground/30" />
+                        <span className="text-xs text-muted-foreground/60">No matching users found</span>
+                      </div>
+                    ) : (
+                      filteredUsers.slice(0, 20).map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => setSelectedUser(u)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60 focus:bg-muted/60 outline-none"
+                        >
+                          <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary">
+                            {u.name?.charAt(0)?.toUpperCase() || "?"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium leading-tight truncate">{u.name}</p>
+                            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">{u.email}</p>
+                          </div>
+                          {u.branch && (
+                            <span className="shrink-0 text-[10px] text-muted-foreground/70">{u.branch}</span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  {filteredUsers.length > 0 && (
+                    <div className="px-3 py-1.5 bg-muted/30 border-t border-border">
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} found
+                        {filteredUsers.length > 20 ? " · showing first 20" : ""}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Registration type — only after user selected */}
+            {selectedUser && (
+              <div className="mt-4 space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Registration Type</Label>
+                <Select value={regForm.registrationType} onValueChange={(v) => setRegForm((p) => ({ ...p, registrationType: v as RegistrationType }))}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Individual">Individual</SelectItem>
+                    <SelectItem value="Team">Team</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 px-6 py-4 mt-2 border-t border-border bg-muted/20">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => { setShowAddReg(false); setSelectedUser(null); setUserSearchQuery(""); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 px-4 text-xs"
+              onClick={handleAddRegistration}
+              disabled={addingReg || !selectedUser}
+            >
+              {addingReg ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
+              Register
             </Button>
           </div>
         </DialogContent>
