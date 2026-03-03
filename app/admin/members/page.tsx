@@ -283,9 +283,9 @@ export default function MembersPage() {
                   style={{
                     backgroundColor: groupMembers[0]?.bgColor || undefined,
                   }}
-                  className="w-[330px] h-[54px] sm:w-[370px] lg:w-[800px] text-center rounded-[100px] items-center justify-center flex border-2 border-stone-900"
+                  className="w-[330px] h-[54px] sm:w-[370px] lg:w-[800px] text-center rounded-[100px] items-center justify-center flex border-2 border-foreground"
                 >
-                  <h2 className="text-xl font-semibold sm:m-1 p-2 text-center text-stone-950">
+                  <h2 className="text-xl font-semibold sm:m-1 p-2 text-center text-foreground">
                     {position}
                   </h2>
                 </div>
@@ -404,15 +404,15 @@ export default function MembersPage() {
           onClick={() => setAddOpen(false)}
         >
           <div
-            className="relative w-[90vw] max-w-3xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-y-auto"
+            className="relative w-[90vw] max-w-3xl max-h-[90vh] bg-card rounded-lg shadow-xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setAddOpen(false)}
-              className="absolute top-3 right-3 z-10 p-1.5 rounded-md hover:bg-stone-100 transition-colors"
+              className="absolute top-3 right-3 z-10 p-1.5 rounded-md hover:bg-muted transition-colors"
               aria-label="Close"
             >
-              <X className="w-5 h-5 text-stone-600" />
+              <X className="w-5 h-5 text-muted-foreground" />
             </button>
 
             <form onSubmit={handleCreate}>
@@ -431,7 +431,7 @@ export default function MembersPage() {
                     className="w-full max-h-[350px] object-contain rounded-md"
                   />
                   <div className="w-full">
-                    <label className="text-xs font-medium text-stone-600">
+                    <label className="text-xs font-medium text-muted-foreground">
                       Photo
                     </label>
                     <input
@@ -448,7 +448,7 @@ export default function MembersPage() {
                       type="button"
                       onClick={() => addFileInputRef.current?.click()}
                       disabled={addUploading}
-                      className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-stone-300 rounded-md bg-white/80 hover:bg-white transition-colors disabled:opacity-50"
+                      className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-border rounded-md bg-card/80 hover:bg-card transition-colors disabled:opacity-50"
                     >
                       {addUploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -462,7 +462,7 @@ export default function MembersPage() {
 
                 {/* Right: Fields */}
                 <div className="md:w-1/2 p-6 space-y-4">
-                  <h2 className="text-xl font-bold text-stone-900">
+                  <h2 className="text-xl font-bold text-foreground">
                     Add New Member
                   </h2>
 
@@ -511,7 +511,7 @@ export default function MembersPage() {
                     />
                     <div className="flex gap-3">
                       <div className="flex-1">
-                        <label className="text-xs font-medium text-stone-600">
+                        <label className="text-xs font-medium text-muted-foreground">
                           Background Color
                         </label>
                         <div className="flex items-center gap-2 mt-1">
@@ -521,7 +521,7 @@ export default function MembersPage() {
                             onChange={(e) =>
                               handleAddChange("bgColor", e.target.value)
                             }
-                            className="w-8 h-8 rounded border border-stone-300 cursor-pointer"
+                            className="w-8 h-8 rounded border border-border cursor-pointer"
                           />
                           <input
                             type="text"
@@ -529,7 +529,7 @@ export default function MembersPage() {
                             onChange={(e) =>
                               handleAddChange("bgColor", e.target.value)
                             }
-                            className="flex-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="flex-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                             placeholder="#e6fffa"
                           />
                         </div>
@@ -537,7 +537,7 @@ export default function MembersPage() {
                     </div>
                     <div className="flex gap-3">
                       <div className="flex-1">
-                        <label className="text-xs font-medium text-stone-600">
+                        <label className="text-xs font-medium text-muted-foreground">
                           Rank
                         </label>
                         <input
@@ -549,11 +549,11 @@ export default function MembersPage() {
                               parseInt(e.target.value) || 0,
                             )
                           }
-                          className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="text-xs font-medium text-stone-600">
+                        <label className="text-xs font-medium text-muted-foreground">
                           Dept Rank
                         </label>
                         <input
@@ -565,7 +565,7 @@ export default function MembersPage() {
                               parseInt(e.target.value) || 0,
                             )
                           }
-                          className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
                     </div>
@@ -576,7 +576,7 @@ export default function MembersPage() {
                     <button
                       type="submit"
                       disabled={creating}
-                      className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-md hover:bg-stone-800 disabled:opacity-50 text-sm font-medium"
+                      className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
                     >
                       {creating ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -618,13 +618,13 @@ function AddField({
 }) {
   return (
     <div>
-      <label className="text-xs font-medium text-stone-600">{label}</label>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         placeholder={placeholder}
       />
     </div>

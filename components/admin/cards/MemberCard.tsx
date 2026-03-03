@@ -153,18 +153,18 @@ export default function MemberCard({
 
   return (
     <>
-      <div className="w-[290px] rounded-lg overflow-hidden border border-black shadow-sm bg-white mb-4 relative group">
+      <div className="w-[290px] rounded-lg overflow-hidden border border-border shadow-sm bg-card mb-4 relative group">
         {/* Edit button — visible on hover */}
         <button
           onClick={openEdit}
-          className="absolute top-2 right-2 z-10 p-1.5 rounded-md bg-white/80 border border-stone-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white"
+          className="absolute top-2 right-2 z-10 p-1.5 rounded-md bg-card/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-card"
           aria-label={`Edit ${name}`}
         >
           <Pencil className="w-4 h-4 text-stone-700" />
         </button>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-black">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-sky-200" />
             <div className="w-3 h-3 rounded-full bg-green-100" />
@@ -190,7 +190,7 @@ export default function MemberCard({
         {/* Footer / details */}
         <div className="px-4 py-3 flex flex-col justify-between">
           <div>
-            <h3 className="font-medium text-stone-800 w-full text-lg font-productSans">
+            <h3 className="font-medium text-card-foreground w-full text-lg font-productSans">
               {name}
             </h3>
           </div>
@@ -207,9 +207,9 @@ export default function MemberCard({
                 <a
                   href={`mailto:${mail}`}
                   aria-label={`Email ${name}`}
-                  className="p-2 rounded-md border"
+                  className="p-2 rounded-md border border-border"
                 >
-                  <Mail className="w-7 h-7 text-stone-950" />
+                  <Mail className="w-7 h-7 text-foreground" />
                 </a>
               )}
 
@@ -219,9 +219,9 @@ export default function MemberCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`${name} on LinkedIn`}
-                  className="p-2 rounded-md border"
+                  className="p-2 rounded-md border border-border"
                 >
-                  <Linkedin className="w-7 h-7 text-stone-950" />
+                  <Linkedin className="w-7 h-7 text-foreground" />
                 </a>
               )}
             </div>
@@ -236,7 +236,7 @@ export default function MemberCard({
           onClick={() => setEditOpen(false)}
         >
           <div
-            className="relative w-[90vw] max-w-3xl max-h-[90vh] bg-white rounded-lg shadow-xl overflow-y-auto"
+            className="relative w-[90vw] max-w-3xl max-h-[90vh] bg-card rounded-lg shadow-xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -279,7 +279,7 @@ export default function MemberCard({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-stone-300 rounded-md bg-white/80 hover:bg-white transition-colors disabled:opacity-50"
+                    className="w-full mt-1 flex items-center justify-center gap-2 px-3 py-2 text-sm border border-border rounded-md bg-card/80 hover:bg-card transition-colors disabled:opacity-50"
                   >
                     {uploading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -293,7 +293,7 @@ export default function MemberCard({
 
               {/* Right: Editable fields */}
               <div className="md:w-1/2 p-6 space-y-4">
-                <h2 className="text-xl font-bold text-stone-900">
+                <h2 className="text-xl font-bold text-foreground">
                   Edit Member
                 </h2>
 
@@ -327,7 +327,7 @@ export default function MemberCard({
                   />
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="text-xs font-medium text-stone-600">
+                      <label className="text-xs font-medium text-muted-foreground">
                         Background Color
                       </label>
                       <div className="flex items-center gap-2 mt-1">
@@ -337,7 +337,7 @@ export default function MemberCard({
                           onChange={(e) =>
                             handleChange("bgColor", e.target.value)
                           }
-                          className="w-8 h-8 rounded border border-stone-300 cursor-pointer"
+                          className="w-8 h-8 rounded border border-border cursor-pointer"
                         />
                         <input
                           type="text"
@@ -345,7 +345,7 @@ export default function MemberCard({
                           onChange={(e) =>
                             handleChange("bgColor", e.target.value)
                           }
-                          className="flex-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="flex-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="#e6fffa"
                         />
                       </div>
@@ -353,7 +353,7 @@ export default function MemberCard({
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="text-xs font-medium text-stone-600">
+                      <label className="text-xs font-medium text-muted-foreground">
                         Rank
                       </label>
                       <input
@@ -362,11 +362,11 @@ export default function MemberCard({
                         onChange={(e) =>
                           handleChange("rank", parseInt(e.target.value) || 0)
                         }
-                        className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="text-xs font-medium text-stone-600">
+                      <label className="text-xs font-medium text-muted-foreground">
                         Dept Rank
                       </label>
                       <input
@@ -378,7 +378,7 @@ export default function MemberCard({
                             parseInt(e.target.value) || 0,
                           )
                         }
-                        className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
                   </div>
@@ -389,7 +389,7 @@ export default function MemberCard({
                   <button
                     onClick={handleSave}
                     disabled={saving || deleting}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-md hover:bg-stone-800 disabled:opacity-50 text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 text-sm font-medium"
                   >
                     {saving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -403,7 +403,7 @@ export default function MemberCard({
                     <button
                       onClick={() => setConfirmDelete(true)}
                       disabled={saving || deleting}
-                      className="flex items-center gap-2 px-4 py-2 border border-stone-300 text-stone-700 rounded-md hover:bg-stone-100 disabled:opacity-50 text-sm font-medium"
+                      className="flex items-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-md hover:bg-muted disabled:opacity-50 text-sm font-medium"
                     >
                       <Trash2 className="w-4 h-4" />
                       Delete
@@ -425,7 +425,7 @@ export default function MemberCard({
                       <button
                         onClick={() => setConfirmDelete(false)}
                         disabled={deleting}
-                        className="px-3 py-2 text-sm text-stone-600 hover:text-stone-900"
+                        className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
                       >
                         Cancel
                       </button>
@@ -462,12 +462,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-xs font-medium text-stone-600">{label}</label>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full mt-1 px-3 py-1.5 text-sm border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full mt-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
     </div>
   );

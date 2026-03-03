@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
+import { normalizeEventData } from "@/lib/normalize";
 
 export async function GET(
   _request: NextRequest,
@@ -14,7 +15,7 @@ export async function GET(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ ...doc.data(), id: doc.id });
+    return NextResponse.json(normalizeEventData({ ...doc.data(), id: doc.id }));
   } catch (err) {
     console.error("Fetch event error:", err);
     return NextResponse.json(

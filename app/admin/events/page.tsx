@@ -42,12 +42,31 @@ const STATUS_OPTIONS = [
   { value: "Cancelled", label: "Cancelled", color: "bg-red-500" },
 ];
 
-/** Extracts "YYYY-MM-DD" from Firestore date string like "2025-10-18 00:00:00" */
-function toDateInput(dateStr: string | null): string {
+/** Extracts "YYYY-MM-DD" from Firestore date string like "2025-10-18 00:00:00"
+ *  Also handles serialized Timestamps { _seconds } and ISO strings */
+function toDateInput(dateStr: unknown): string {
   if (!dateStr) return "";
+
+  // Handle serialized Timestamp objects: { _seconds, _nanoseconds }
+  if (typeof dateStr === "object" && dateStr !== null) {
+    const secs = (dateStr as any)._seconds ?? (dateStr as any).seconds;
+    if (typeof secs === "number") {
+      const d = new Date(secs * 1000);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+    return "";
+  }
+
   const str = String(dateStr);
+  // Try "YYYY-MM-DD..." pattern
   const match = str.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match ? match[1] : "";
+  if (match) return match[1];
+  // Try parsing as a Date string (e.g. ISO format)
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+  }
+  return "";
 }
 
 /** Converts "YYYY-MM-DD" back to Firestore format "YYYY-MM-DD 00:00:00" */
@@ -345,7 +364,7 @@ export default function EventsPage() {
             events.map((event) => (
               <Card
                 key={event.id}
-                className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none bg-gradient-to-r from-white to-slate-50/50 shadow-md cursor-pointer p-3"
+                className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-none bg-gradient-to-r from-card to-muted/50 shadow-md cursor-pointer p-3"
                 onClick={() => router.push(`/admin/events/${event.id}`)}
               >
                 <div className="flex flex-col md:flex-row min-h-[180px]">
@@ -371,8 +390,8 @@ export default function EventsPage() {
                               : "bg-slate-500 text-white"
                         }`}
                       >
-                        {event.status?.charAt(0).toUpperCase() +
-                          event.status?.slice(1) || "Draft"}
+                        {(event.status?.charAt(0).toUpperCase() ?? "") +
+                          (event.status?.slice(1) ?? "") || "Draft"}
                       </span>
                     </div>
                   </div>
@@ -380,11 +399,11 @@ export default function EventsPage() {
                   <div className="flex-1 px-5 py-3 md:px-6 md:py-2 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <CardTitle className="text-2xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        <CardTitle className="text-2xl font-bold text-foreground group-hover:text-blue-600 transition-colors">
                           {event.title}
                         </CardTitle>
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center text-slate-500 font-medium">
+                          <div className="flex items-center text-muted-foreground font-medium">
                             <Calendar className="h-4 w-4 mr-2 text-blue-500" />
                             <span className="text-sm">
                               {event.Date
@@ -403,7 +422,7 @@ export default function EventsPage() {
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => openEdit(event)}
-                              className="p-2 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                               title="Edit event"
                             >
                               <Pencil className="w-4 h-4" />
@@ -423,7 +442,7 @@ export default function EventsPage() {
                                 </button>
                                 <button
                                   onClick={() => setConfirmDeleteId(null)}
-                                  className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700"
+                                  className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                                 >
                                   Cancel
                                 </button>
@@ -431,7 +450,7 @@ export default function EventsPage() {
                             ) : (
                               <button
                                 onClick={() => setConfirmDeleteId(event.id)}
-                                className="p-2 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                className="p-2 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                                 title="Delete event"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -440,15 +459,15 @@ export default function EventsPage() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-slate-600 line-clamp-2 mb-4 leading-relaxed">
+                      <p className="text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
                         {event.description}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-6 mt-auto">
                       {event.venue && (
-                        <div className="flex items-center text-sm text-slate-500">
-                          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center mr-3">
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mr-3">
                             <svg
                               className="w-4 h-4 text-blue-600"
                               fill="none"
@@ -473,8 +492,8 @@ export default function EventsPage() {
                         </div>
                       )}
                       {event.organizer && (
-                        <div className="flex items-center text-sm text-slate-500">
-                          <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center mr-3">
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center mr-3">
                             <svg
                               className="w-4 h-4 text-indigo-600"
                               fill="none"
@@ -498,7 +517,7 @@ export default function EventsPage() {
                           {event.tags.slice(0, 3).map((tag: string) => (
                             <span
                               key={tag}
-                              className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider"
+                              className="px-2 py-1 bg-muted text-muted-foreground rounded text-[10px] font-bold uppercase tracking-wider"
                             >
                               {tag}
                             </span>
@@ -518,29 +537,28 @@ export default function EventsPage() {
       {editOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => { setEditOpen(false); setEditingId(null); }}
         >
           <div
-            className="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-4xl max-h-[92vh] bg-background rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 bg-stone-50 flex-shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted flex-shrink-0">
               <div>
-                <h2 className="text-lg font-bold text-stone-900">Edit Event</h2>
-                <p className="text-xs text-stone-500 mt-0.5">Update event details below</p>
+                <h2 className="text-lg font-bold text-foreground">Edit Event</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Update event details below</p>
               </div>
               <button
                 onClick={() => { setEditOpen(false); setEditingId(null); }}
-                className="p-1.5 rounded-md hover:bg-stone-200 transition-colors"
+                className="p-1.5 rounded-md hover:bg-muted transition-colors"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-stone-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex border-b border-stone-200 bg-white px-6 flex-shrink-0">
+            <div className="flex border-b border-border bg-background px-6 flex-shrink-0">
               {([
                 { key: "details" as const, label: "Details", icon: <Calendar className="w-3.5 h-3.5" /> },
                 { key: "content" as const, label: "Content", icon: <Star className="w-3.5 h-3.5" /> },
@@ -553,8 +571,8 @@ export default function EventsPage() {
                   onClick={() => setEditTab(tab.key)}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     editTab === tab.key
-                      ? "border-stone-900 text-stone-900"
-                      : "border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300"
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                   }`}
                 >
                   {tab.icon}
@@ -575,22 +593,22 @@ export default function EventsPage() {
                     <SectionLabel icon={<Star className="w-4 h-4" />} title="Basic Info" />
                     <div className="space-y-4 mt-3">
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Event Title</label>
+                        <label className="text-xs font-medium text-muted-foreground">Event Title</label>
                         <input
                           type="text"
                           value={editForm.title}
                           onChange={(e) => updateField("title", e.target.value)}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="e.g. Google Cloud Study Jams"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Description</label>
+                        <label className="text-xs font-medium text-muted-foreground">Description</label>
                         <textarea
                           value={editForm.description}
                           onChange={(e) => updateField("description", e.target.value)}
                           rows={4}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 resize-y"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
                           placeholder="Describe the event..."
                         />
                       </div>
@@ -602,42 +620,42 @@ export default function EventsPage() {
                     <SectionLabel icon={<Calendar className="w-4 h-4" />} title="Schedule & Venue" />
                     <div className="grid grid-cols-2 gap-4 mt-3">
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Date</label>
+                        <label className="text-xs font-medium text-muted-foreground">Date</label>
                         <input
                           type="date"
                           value={editForm.date}
                           onChange={(e) => updateField("date", e.target.value)}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Venue</label>
+                        <label className="text-xs font-medium text-muted-foreground">Venue</label>
                         <input
                           type="text"
                           value={editForm.venue}
                           onChange={(e) => updateField("venue", e.target.value)}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="e.g. Open Labs, C Block"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Start Time</label>
+                        <label className="text-xs font-medium text-muted-foreground">Start Time</label>
                         <input
                           type="time"
                           value={editForm.timeStart}
                           onChange={(e) => updateField("timeStart", e.target.value)}
                           onClick={(e) => (e.currentTarget as any).showPicker?.()}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 cursor-pointer"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">End Time</label>
+                        <label className="text-xs font-medium text-muted-foreground">End Time</label>
                         <input
                           type="time"
                           value={editForm.timeEnd}
                           onChange={(e) => updateField("timeEnd", e.target.value)}
                           onClick={(e) => (e.currentTarget as any).showPicker?.()}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 cursor-pointer"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
                         />
                       </div>
                     </div>
@@ -648,12 +666,12 @@ export default function EventsPage() {
                     <SectionLabel icon={<Hash className="w-4 h-4" />} title="Status" />
                     <div className="grid grid-cols-3 gap-x-4 gap-y-4 mt-3 items-end">
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Event Status</label>
+                        <label className="text-xs font-medium text-muted-foreground">Event Status</label>
                         <div className="relative mt-1">
                           <select
                             value={editForm.status}
                             onChange={(e) => updateField("status", e.target.value)}
-                            className="w-full h-[42px] px-3 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 appearance-none bg-white pr-8"
+                            className="w-full h-[42px] px-3 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring appearance-none bg-background text-foreground pr-8"
                           >
                             {STATUS_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -665,12 +683,12 @@ export default function EventsPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Display Rank</label>
+                        <label className="text-xs font-medium text-muted-foreground">Display Rank</label>
                         <div className="flex items-center gap-0 mt-1">
                           <button
                             type="button"
                             onClick={() => updateField("rank", Math.max(0, editForm.rank - 1))}
-                            className="h-[42px] w-10 flex items-center justify-center border border-stone-300 rounded-l-lg bg-stone-50 hover:bg-stone-100 transition-colors text-stone-600 flex-shrink-0"
+                            className="h-[42px] w-10 flex items-center justify-center border border-border rounded-l-lg bg-muted hover:bg-accent transition-colors text-muted-foreground flex-shrink-0"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
@@ -679,12 +697,12 @@ export default function EventsPage() {
                             min={0}
                             value={editForm.rank}
                             onChange={(e) => updateField("rank", parseInt(e.target.value) || 0)}
-                            className="h-[42px] flex-1 min-w-0 px-3 text-sm text-center border-y border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="h-[42px] flex-1 min-w-0 px-3 text-sm text-center border-y border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <button
                             type="button"
                             onClick={() => updateField("rank", editForm.rank + 1)}
-                            className="h-[42px] w-10 flex items-center justify-center border border-stone-300 rounded-r-lg bg-stone-50 hover:bg-stone-100 transition-colors text-stone-600 flex-shrink-0"
+                            className="h-[42px] w-10 flex items-center justify-center border border-border rounded-r-lg bg-muted hover:bg-accent transition-colors text-muted-foreground flex-shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -697,11 +715,11 @@ export default function EventsPage() {
                             role="switch"
                             aria-checked={editForm.isDone}
                             onClick={() => updateField("isDone", !editForm.isDone)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editForm.isDone ? "bg-green-500" : "bg-stone-300"}`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editForm.isDone ? "bg-green-500" : "bg-muted"}`}
                           >
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${editForm.isDone ? "translate-x-6" : "translate-x-1"}`} />
                           </button>
-                          <span className="text-sm text-stone-700">Completed</span>
+                          <span className="text-sm text-muted-foreground">Completed</span>
                         </label>
                       </div>
                     </div>
@@ -712,32 +730,32 @@ export default function EventsPage() {
                     <SectionLabel icon={<Users className="w-4 h-4" />} title="Organizers" />
                     <div className="grid grid-cols-3 gap-4 mt-3">
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Organizer</label>
+                        <label className="text-xs font-medium text-muted-foreground">Organizer</label>
                         <input
                           type="text"
                           value={editForm.organizer}
                           onChange={(e) => updateField("organizer", e.target.value)}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="Lead organizer name"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Co-Organizer</label>
+                        <label className="text-xs font-medium text-muted-foreground">Co-Organizer</label>
                         <input
                           type="text"
                           value={editForm.coOrganizer}
                           onChange={(e) => updateField("coOrganizer", e.target.value)}
-                          className="w-full mt-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="Co-organizer name"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Members Participated</label>
+                        <label className="text-xs font-medium text-muted-foreground">Members Participated</label>
                         <div className="flex items-center gap-0 mt-1">
                           <button
                             type="button"
                             onClick={() => updateField("MembersParticipated", Math.max(0, editForm.MembersParticipated - 1))}
-                            className="h-[42px] w-10 flex items-center justify-center border border-stone-300 rounded-l-lg bg-stone-50 hover:bg-stone-100 transition-colors text-stone-600 flex-shrink-0"
+                            className="h-[42px] w-10 flex items-center justify-center border border-border rounded-l-lg bg-muted hover:bg-accent transition-colors text-muted-foreground flex-shrink-0"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
@@ -746,12 +764,12 @@ export default function EventsPage() {
                             min={0}
                             value={editForm.MembersParticipated}
                             onChange={(e) => updateField("MembersParticipated", parseInt(e.target.value) || 0)}
-                            className="h-[42px] flex-1 min-w-0 px-3 text-sm text-center border-y border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="h-[42px] flex-1 min-w-0 px-3 text-sm text-center border-y border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <button
                             type="button"
                             onClick={() => updateField("MembersParticipated", editForm.MembersParticipated + 1)}
-                            className="h-[42px] w-10 flex items-center justify-center border border-stone-300 rounded-r-lg bg-stone-50 hover:bg-stone-100 transition-colors text-stone-600 flex-shrink-0"
+                            className="h-[42px] w-10 flex items-center justify-center border border-border rounded-r-lg bg-muted hover:bg-accent transition-colors text-muted-foreground flex-shrink-0"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
@@ -774,7 +792,7 @@ export default function EventsPage() {
                         {editForm.tags.map((tag, i) => (
                           <span
                             key={i}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 text-stone-700 rounded-full text-xs font-medium"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted text-foreground rounded-full text-xs font-medium"
                           >
                             {tag}
                             <button
@@ -799,13 +817,13 @@ export default function EventsPage() {
                               setTagInput("");
                             }
                           }}
-                          className="flex-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="flex-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="Type a tag and press Enter"
                         />
                         <button
                           type="button"
                           onClick={() => { addToArray("tags", tagInput); setTagInput(""); }}
-                          className="px-3 py-2.5 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors text-stone-600"
+                          className="px-3 py-2.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors text-muted-foreground"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -819,14 +837,14 @@ export default function EventsPage() {
                     <div className="mt-3 space-y-2">
                       {editForm.keyHighlights.map((item, i) => (
                         <div key={i} className="flex items-center gap-3 group py-1">
-                          <span className="w-6 h-6 flex items-center justify-center rounded-full bg-stone-100 text-stone-500 text-xs font-bold flex-shrink-0">
+                          <span className="w-6 h-6 flex items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-bold flex-shrink-0">
                             {i + 1}
                           </span>
-                          <span className="flex-1 text-sm text-stone-700">{item}</span>
+                          <span className="flex-1 text-sm text-foreground">{item}</span>
                           <button
                             type="button"
                             onClick={() => removeFromArray("keyHighlights", i)}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all text-stone-400"
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all text-muted-foreground"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -844,13 +862,13 @@ export default function EventsPage() {
                               setHighlightInput("");
                             }
                           }}
-                          className="flex-1 px-3 py-2.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                          className="flex-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="Add a highlight and press Enter"
                         />
                         <button
                           type="button"
                           onClick={() => { addToArray("keyHighlights", highlightInput); setHighlightInput(""); }}
-                          className="px-3 py-2.5 text-sm border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors text-stone-600"
+                          className="px-3 py-2.5 text-sm border border-border rounded-lg hover:bg-muted transition-colors text-muted-foreground"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -865,7 +883,7 @@ export default function EventsPage() {
                 <div>
                   <section>
                     <SectionLabel icon={<Palette className="w-4 h-4" />} title="Theme Colors" />
-                    <p className="text-sm text-stone-500 mt-2 mb-4">Pick up to 5 colors for the event page theme. Click a swatch to change its color.</p>
+                    <p className="text-sm text-muted-foreground mt-2 mb-4">Pick up to 5 colors for the event page theme. Click a swatch to change its color.</p>
                     <div className="flex flex-wrap gap-4 items-start">
                       {editForm.Theme.map((color, i) => (
                         <div key={i} className="flex flex-col items-center gap-1.5 group relative">
@@ -877,18 +895,18 @@ export default function EventsPage() {
                               className="sr-only"
                             />
                             <div
-                              className="w-14 h-14 rounded-xl border-2 border-stone-200 shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                              className="w-14 h-14 rounded-xl border-2 border-border shadow-sm hover:scale-110 transition-transform cursor-pointer"
                               style={{ backgroundColor: color }}
                               title={color}
                             />
                           </label>
-                          <span className="text-[11px] font-mono text-stone-400">{color}</span>
+                          <span className="text-[11px] font-mono text-muted-foreground">{color}</span>
                           <button
                             type="button"
                             onClick={() => removeFromArray("Theme", i)}
-                            className="absolute -top-2 -right-2 w-5 h-5 bg-stone-200 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-200 transition-all"
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-muted rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-200 dark:hover:bg-red-900 transition-all"
                           >
-                            <X className="w-3 h-3 text-stone-600" />
+                            <X className="w-3 h-3 text-muted-foreground" />
                           </button>
                         </div>
                       ))}
@@ -896,7 +914,7 @@ export default function EventsPage() {
                         <button
                           type="button"
                           onClick={() => addToArray("Theme", "#4285F4")}
-                          className="w-14 h-14 rounded-xl border-2 border-dashed border-stone-300 flex items-center justify-center text-stone-400 hover:border-stone-400 hover:text-stone-500 transition-colors"
+                          className="w-14 h-14 rounded-xl border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
                           title="Add color"
                         >
                           <Plus className="w-5 h-5" />
@@ -917,16 +935,16 @@ export default function EventsPage() {
                     <div className="grid grid-cols-2 gap-6 mt-3">
                       {/* Poster Image */}
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Poster Image</label>
+                        <label className="text-xs font-medium text-muted-foreground">Poster Image</label>
                         <input ref={posterInputRef} type="file" accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "poster"); e.target.value = ""; }} />
                         {editForm.imageUrl ? (
-                          <div className="mt-1 relative group rounded-lg overflow-hidden border border-stone-200 h-40">
+                          <div className="mt-1 relative group rounded-lg overflow-hidden border border-border h-40">
                             <img src={editForm.imageUrl} alt="Poster" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                              <button type="button" onClick={() => posterInputRef.current?.click()} className="px-3 py-1.5 bg-white rounded-md text-xs font-medium text-stone-700 hover:bg-stone-100">
+                              <button type="button" onClick={() => posterInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs font-medium text-foreground hover:bg-muted">
                                 Replace
                               </button>
-                              <button type="button" onClick={() => updateField("imageUrl", "")} className="px-3 py-1.5 bg-white rounded-md text-xs font-medium text-red-600 hover:bg-red-50">
+                              <button type="button" onClick={() => updateField("imageUrl", "")} className="px-3 py-1.5 bg-background rounded-md text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950">
                                 Remove
                               </button>
                             </div>
@@ -936,7 +954,7 @@ export default function EventsPage() {
                             type="button"
                             onClick={() => posterInputRef.current?.click()}
                             disabled={uploadingPoster}
-                            className="w-full mt-1 h-40 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center gap-2 text-stone-400 hover:border-stone-400 hover:text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-50"
+                            className="w-full mt-1 h-40 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
                           >
                             {uploadingPoster ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                             <span className="text-xs font-medium">{uploadingPoster ? "Uploading..." : "Upload Poster"}</span>
@@ -945,16 +963,16 @@ export default function EventsPage() {
                       </div>
                       {/* Cover Image */}
                       <div>
-                        <label className="text-xs font-medium text-stone-600">Cover Image</label>
+                        <label className="text-xs font-medium text-muted-foreground">Cover Image</label>
                         <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "cover"); e.target.value = ""; }} />
                         {editForm.coverUrl ? (
-                          <div className="mt-1 relative group rounded-lg overflow-hidden border border-stone-200 h-40">
+                          <div className="mt-1 relative group rounded-lg overflow-hidden border border-border h-40">
                             <img src={editForm.coverUrl} alt="Cover" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                              <button type="button" onClick={() => coverInputRef.current?.click()} className="px-3 py-1.5 bg-white rounded-md text-xs font-medium text-stone-700 hover:bg-stone-100">
+                              <button type="button" onClick={() => coverInputRef.current?.click()} className="px-3 py-1.5 bg-background rounded-md text-xs font-medium text-foreground hover:bg-muted">
                                 Replace
                               </button>
-                              <button type="button" onClick={() => updateField("coverUrl", "")} className="px-3 py-1.5 bg-white rounded-md text-xs font-medium text-red-600 hover:bg-red-50">
+                              <button type="button" onClick={() => updateField("coverUrl", "")} className="px-3 py-1.5 bg-background rounded-md text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950">
                                 Remove
                               </button>
                             </div>
@@ -964,7 +982,7 @@ export default function EventsPage() {
                             type="button"
                             onClick={() => coverInputRef.current?.click()}
                             disabled={uploadingCover}
-                            className="w-full mt-1 h-40 border-2 border-dashed border-stone-300 rounded-lg flex flex-col items-center justify-center gap-2 text-stone-400 hover:border-stone-400 hover:text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-50"
+                            className="w-full mt-1 h-40 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
                           >
                             {uploadingCover ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                             <span className="text-xs font-medium">{uploadingCover ? "Uploading..." : "Upload Cover"}</span>
@@ -988,8 +1006,8 @@ export default function EventsPage() {
                       {editForm.eventGallery.length > 0 && (
                         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-3">
                           {editForm.eventGallery.map((url, i) => (
-                            <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-stone-200">
-                              <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = ""; e.currentTarget.className = "w-full h-full bg-stone-100"; }} />
+                            <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
+                              <img src={url} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = ""; e.currentTarget.className = "w-full h-full bg-muted"; }} />
                               <button
                                 type="button"
                                 onClick={() => removeFromArray("eventGallery", i)}
@@ -1005,7 +1023,7 @@ export default function EventsPage() {
                         type="button"
                         onClick={() => galleryInputRef.current?.click()}
                         disabled={uploadingGallery}
-                        className="w-full h-24 border-2 border-dashed border-stone-300 rounded-lg flex items-center justify-center gap-2 text-stone-400 hover:border-stone-400 hover:text-stone-500 hover:bg-stone-50 transition-colors disabled:opacity-50"
+                        className="w-full h-24 border-2 border-dashed border-border rounded-lg flex items-center justify-center gap-2 text-muted-foreground hover:border-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
                       >
                         {uploadingGallery ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                         <span className="text-xs font-medium">{uploadingGallery ? "Uploading..." : "Upload Gallery Images"}</span>
@@ -1018,18 +1036,18 @@ export default function EventsPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 px-6 py-4 border-t border-stone-200 bg-stone-50 flex-shrink-0">
+            <div className="flex items-center gap-3 px-6 py-4 border-t border-border bg-muted flex-shrink-0">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 text-sm font-medium transition-colors"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Saving..." : "Save Changes"}
               </button>
               <button
                 onClick={() => { setEditOpen(false); setEditingId(null); }}
-                className="px-5 py-2.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
+                className="px-5 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
@@ -1046,7 +1064,7 @@ export default function EventsPage() {
 
 function SectionLabel({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="flex items-center gap-2 text-stone-800 font-semibold text-sm border-b border-stone-200 pb-2">
+    <div className="flex items-center gap-2 text-foreground font-semibold text-sm border-b border-border pb-2">
       {icon}
       {title}
     </div>

@@ -331,7 +331,9 @@ export default function ClientUsersPage() {
                         {user.graduationYear || "—"}
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                        {user.phoneNumber || "—"}
+                        {user.phoneNumber
+                          ? user.phoneNumber.slice(0, -4).replace(/./g, "*") + user.phoneNumber.slice(-4)
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         {user.isBlocked ? (
@@ -499,7 +501,7 @@ export default function ClientUsersPage() {
                   Personal Information
                 </h4>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                  <DetailItem label="Phone Number" value={selectedUser.phoneNumber} />
+                  <DetailItem label="Phone Number" value={selectedUser.phoneNumber ? selectedUser.phoneNumber.slice(0, -4).replace(/./g, "*") + selectedUser.phoneNumber.slice(-4) : ""} />
                   <DetailItem label="Branch" value={selectedUser.branch} />
                   <DetailItem
                     label="Graduation Year"
