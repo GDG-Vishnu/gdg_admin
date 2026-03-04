@@ -12,30 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   ArrowLeft,
   Calendar,
@@ -43,42 +19,34 @@ import {
   Users,
   Clock,
   Pencil,
-  Trash2,
-  UserPlus,
-  CheckCircle,
-  XCircle,
   Loader2,
-  Eye,
   Tag,
   Star,
-  Building2,
   GraduationCap,
-  Search,
   Globe,
   Linkedin,
   Mail,
   Shield,
   MessageSquare,
   Mic,
-  BookOpen,
   UserCheck,
   CalendarClock,
   Hash,
   Info,
   ExternalLink,
+  CheckCircle,
+  ClipboardList,
 } from "lucide-react";
 import GoogleLoader from "@/components/GoogleLoader";
 import { ManagedEventEditDialog } from "@/components/admin/ManagedEventEditDialog";
 import type {
   ManagedEvent,
   RegisteredMember,
-  RegistrationType,
 } from "@/lib/types/managed-event";
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-zinc-500",
-  PUBLISHED: "bg-blue-500",
-  CLOSED: "bg-amber-500",
+  UPCOMING: "bg-blue-500",
+  ONGOING: "bg-amber-500",
   COMPLETED: "bg-green-500",
 };
 
@@ -112,43 +80,13 @@ export default function ManagedEventDetailPage() {
   const eventId = params.id as string;
 
   const [event, setEvent] = useState<ManagedEvent | null>(null);
-  const [registrations, setRegistrations] = useState<
-    (RegisteredMember & { regId: string })[]
-  >([]);
+  const [regCount, setRegCount] = useState(0);
+  const [checkedInCount, setCheckedInCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [regLoading, setRegLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Add registration dialog
-  const [showAddReg, setShowAddReg] = useState(false);
-  const [addingReg, setAddingReg] = useState(false);
-  const [regForm, setRegForm] = useState({
-    userId: "",
-    name: "",
-    email: "",
-    phone: "",
-    registrationType: "Individual" as RegistrationType,
-  });
-
-  // User search for manual registration
-  const [allClientUsers, setAllClientUsers] = useState<
-    { id: string; name: string; email: string; phoneNumber: string; branch: string; profileUrl: string }[]
-  >([]);
-  const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; email: string; phoneNumber: string; branch: string; profileUrl: string } | null>(null);
-
-  // Search
-  const [search, setSearch] = useState("");
 
   // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
-
-  // Check-in toggling
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-  // Delete confirm
-  const [confirmDeleteRegId, setConfirmDeleteRegId] = useState<string | null>(null);
-  const [deletingRegId, setDeletingRegId] = useState<string | null>(null);
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -166,132 +104,23 @@ export default function ManagedEventDetailPage() {
     }
   }, [eventId]);
 
-  const fetchRegistrations = useCallback(async () => {
+  const fetchRegCounts = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/admin/managed-events/${eventId}/registrations`,
-      );
+      const res = await fetch(`/api/admin/managed-events/${eventId}/registrations`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        setRegistrations(data);
+        setRegCount(data.length);
+        setCheckedInCount(data.filter((r: RegisteredMember) => r.isCheckedIn).length);
       }
     } catch {
       console.error("Failed to load registrations");
-    } finally {
-      setRegLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
     fetchEvent();
-    fetchRegistrations();
-  }, [fetchEvent, fetchRegistrations]);
-
-  // Fetch client users when add-reg dialog opens
-  useEffect(() => {
-    if (!showAddReg || allClientUsers.length > 0) return;
-    setLoadingUsers(true);
-    fetch("/api/admin/users")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setAllClientUsers(data);
-      })
-      .catch(() => console.error("Failed to load users"))
-      .finally(() => setLoadingUsers(false));
-  }, [showAddReg, allClientUsers.length]);
-
-  // Filter users by search query, exclude already-registered emails
-  const registeredEmails = new Set(registrations.map((r) => r.email.toLowerCase()));
-  const filteredUsers = userSearchQuery.trim().length >= 2
-    ? allClientUsers.filter(
-        (u) =>
-          !registeredEmails.has(u.email.toLowerCase()) &&
-          (u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-            u.email.toLowerCase().includes(userSearchQuery.toLowerCase()))
-      )
-    : [];
-
-  async function handleAddRegistration() {
-    if (!selectedUser) return;
-    setAddingReg(true);
-    try {
-      const res = await fetch(
-        `/api/admin/managed-events/${eventId}/registrations`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: selectedUser.id,
-            name: selectedUser.name,
-            email: selectedUser.email,
-            phone: selectedUser.phoneNumber || "",
-            registrationType: regForm.registrationType,
-          }),
-        },
-      );
-      if (res.ok) {
-        setShowAddReg(false);
-        setSelectedUser(null);
-        setUserSearchQuery("");
-        setRegForm({
-          userId: "",
-          name: "",
-          email: "",
-          phone: "",
-          registrationType: "Individual",
-        });
-        fetchRegistrations();
-      }
-    } catch {
-      console.error("Failed to add registration");
-    } finally {
-      setAddingReg(false);
-    }
-  }
-
-  async function handleToggleCheckIn(regId: string, current: boolean) {
-    setTogglingId(regId);
-    try {
-      await fetch(
-        `/api/admin/managed-events/${eventId}/registrations/${regId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isCheckedIn: !current }),
-        },
-      );
-      fetchRegistrations();
-    } catch {
-      console.error("Failed to toggle check-in");
-    } finally {
-      setTogglingId(null);
-    }
-  }
-
-  async function handleDeleteRegistration(regId: string) {
-    setDeletingRegId(regId);
-    try {
-      await fetch(
-        `/api/admin/managed-events/${eventId}/registrations/${regId}`,
-        { method: "DELETE" },
-      );
-      setRegistrations((prev) => prev.filter((r) => r.regId !== regId));
-      setConfirmDeleteRegId(null);
-    } catch {
-      console.error("Failed to delete registration");
-    } finally {
-      setDeletingRegId(null);
-    }
-  }
-
-  const filteredRegs = registrations.filter(
-    (r) =>
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.email.toLowerCase().includes(search.toLowerCase()) ||
-      r.phone.includes(search),
-  );
-
-  const checkedInCount = registrations.filter((r) => r.isCheckedIn).length;
+    fetchRegCounts();
+  }, [fetchEvent, fetchRegCounts]);
 
   if (loading) return <GoogleLoader message="Loading event..." />;
   if (error || !event) {
@@ -329,9 +158,17 @@ export default function ManagedEventDetailPage() {
           >
             <ArrowLeft className="h-3.5 w-3.5" /> All Events
           </button>
-          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => router.push(`/admin/managed-events/${eventId}/registrations`)}>
+              <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Registrations
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { /* TODO: send tickets logic */ }}>
+              <Mail className="mr-1.5 h-3.5 w-3.5" /> Send Tickets
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+            </Button>
+          </div>
         </div>
 
         {/* ── Hero ── */}
@@ -391,13 +228,11 @@ export default function ManagedEventDetailPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
             { icon: Calendar, label: "Starts", value: formatDate(event.startDate), color: "text-primary", bg: "bg-primary/8" },
+            { icon: CalendarClock, label: "Ends", value: formatDate(event.endDate), color: "text-violet-500", bg: "bg-violet-500/8" },
             { icon: MapPin,    label: "Venue",  value: event.venue || "TBD",         color: "text-sky-500", bg: "bg-sky-500/8" },
-            { icon: Users,     label: "Registered",
-              value: `${registrations.length}${event.maxParticipants ? ` / ${event.maxParticipants}` : ""}`,
+            { icon: Users,     label: "Mode / Type",
+              value: `${event.mode} · ${event.eventType}`,
               color: "text-emerald-500", bg: "bg-emerald-500/8" },
-            { icon: CheckCircle, label: "Checked In",
-              value: `${checkedInCount} / ${registrations.length}`,
-              color: "text-amber-500", bg: "bg-amber-500/8" },
           ].map(({ icon: Icon, label, value, color, bg }) => (
             <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border px-3.5 py-3 bg-card">
               <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>
@@ -409,6 +244,56 @@ export default function ManagedEventDetailPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* ── Registration Summary ── */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden mb-5">
+          <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                  event.isRegistrationOpen
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                    : "bg-muted-foreground/30"
+                }`} />
+                <div>
+                  <p className="text-sm font-semibold">
+                    Registration is {event.isRegistrationOpen ? "Open" : "Closed"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {event.registrationStart && event.registrationEnd
+                      ? `${formatDate(event.registrationStart)} — ${formatDate(event.registrationEnd)}`
+                      : event.registrationStart
+                        ? `Opens ${formatDate(event.registrationStart)}`
+                        : "No registration window configured"}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-5 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-semibold tabular-nums">{regCount}</span>
+                  {event.maxParticipants > 0 && (
+                    <span className="text-muted-foreground text-xs">/ {event.maxParticipants}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="font-semibold tabular-nums">{checkedInCount}</span>
+                  <span className="text-muted-foreground text-xs">checked in</span>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="h-8 text-xs shrink-0"
+                onClick={() => router.push(`/admin/managed-events/${eventId}/registrations`)}
+              >
+                <ClipboardList className="mr-1.5 h-3.5 w-3.5" /> Manage Registrations
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* ── Main content ── */}
@@ -434,31 +319,6 @@ export default function ManagedEventDetailPage() {
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                     <span className="text-muted-foreground text-xs flex-shrink-0">{k}</span>
-                    <span className="font-medium text-xs text-right">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Registration Window */}
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-                <CalendarClock className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Registration</span>
-              </div>
-              <div className="divide-y divide-border">
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-muted-foreground text-xs">Status</span>
-                  {event.isRegistrationOpen
-                    ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Open</span>
-                    : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-muted text-muted-foreground border border-border">Closed</span>}
-                </div>
-                {([
-                  ["Opens",  formatDate(event.registrationStart)],
-                  ["Closes", formatDate(event.registrationEnd)],
-                ] as [string, string][]).map(([k, v]) => (
-                  <div key={k} className="flex items-start justify-between gap-3 px-4 py-2.5">
-                    <span className="text-muted-foreground text-xs">{k}</span>
                     <span className="font-medium text-xs text-right">{v}</span>
                   </div>
                 ))}
@@ -642,259 +502,10 @@ export default function ManagedEventDetailPage() {
               </div>
             )}
 
-            {/* Registrations */}
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Registrations</span>
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">{registrations.length}</span>
-                </div>
-                <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => setShowAddReg(true)}>
-                  <UserPlus className="mr-1.5 h-3 w-3" /> Add
-                </Button>
-              </div>
-
-              {/* Search */}
-              <div className="px-4 py-3 border-b border-border">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name, email, or phone..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 h-8 text-sm"
-                  />
-                </div>
-              </div>
-
-              {regLoading ? (
-                <div className="py-14 text-center text-muted-foreground text-sm">
-                  <Loader2 className="w-5 h-5 mx-auto animate-spin mb-2" /> Loading…
-                </div>
-              ) : filteredRegs.length === 0 ? (
-                <div className="py-14 text-center text-muted-foreground">
-                  <Users className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">{search ? "No matches found." : "No registrations yet."}</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="text-xs">Name</TableHead>
-                        <TableHead className="text-xs">Email</TableHead>
-                        <TableHead className="text-xs">Phone</TableHead>
-                        <TableHead className="text-xs">Type</TableHead>
-                        <TableHead className="text-xs">Registered</TableHead>
-                        <TableHead className="text-xs text-center">In</TableHead>
-                        <TableHead className="text-xs text-right"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredRegs.map((reg, idx) => (
-                        <TableRow key={reg.regId || `reg-${idx}`} className="text-sm">
-                          <TableCell className="font-medium py-2.5">{reg.name}</TableCell>
-                          <TableCell className="text-muted-foreground py-2.5">{reg.email}</TableCell>
-                          <TableCell className="text-muted-foreground py-2.5 font-mono text-xs">
-                            {reg.phone ? reg.phone.slice(0, -4).replace(/\d/g, "•") + reg.phone.slice(-4) : "–"}
-                          </TableCell>
-                          <TableCell className="py-2.5">
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded border border-border text-muted-foreground">{reg.registrationType}</span>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground py-2.5">{formatDate(reg.registeredAt)}</TableCell>
-                          <TableCell className="text-center py-2.5">
-                            <button
-                              onClick={() => handleToggleCheckIn(reg.regId, reg.isCheckedIn)}
-                              disabled={togglingId === reg.regId}
-                              className="inline-flex"
-                            >
-                              {togglingId === reg.regId
-                                ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                                : reg.isCheckedIn
-                                  ? <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                  : <XCircle className="w-4 h-4 text-muted-foreground/40" />}
-                            </button>
-                          </TableCell>
-                          <TableCell className="text-right py-2.5">
-                            {confirmDeleteRegId === reg.regId ? (
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => handleDeleteRegistration(reg.regId)}
-                                  disabled={deletingRegId === reg.regId}
-                                  className="px-2 py-0.5 bg-red-600 text-white rounded text-[11px] hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {deletingRegId === reg.regId ? <Loader2 className="w-3 h-3 animate-spin" /> : "Delete"}
-                                </button>
-                                <button onClick={() => setConfirmDeleteRegId(null)} className="px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground">
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDeleteRegId(reg.regId)}
-                                className="p-1 rounded text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-
           </div>
         </div>
+
       </div>
-
-      {/* Add Registration Dialog */}
-      <Dialog open={showAddReg} onOpenChange={(open) => {
-        setShowAddReg(open);
-        if (!open) { setSelectedUser(null); setUserSearchQuery(""); }
-      }}>
-        <DialogContent className="sm:max-w-[440px] p-0 gap-0 overflow-hidden">
-          {/* Header */}
-          <div className="px-6 pt-6 pb-4">
-            <DialogHeader>
-              <DialogTitle className="text-base font-semibold">Add Registration</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                Search and select a user from the system to register.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          {/* Body */}
-          <div className="px-6 pb-2">
-            {selectedUser ? (
-              /* ── Selected user card ── */
-              <div className="flex items-center gap-3 px-3 py-3 rounded-lg border border-border bg-muted/40">
-                <div className="shrink-0 w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-xs font-bold text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20">
-                  {selectedUser.name?.charAt(0)?.toUpperCase() || "?"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium leading-tight truncate">{selectedUser.name}</p>
-                  <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">{selectedUser.email}</p>
-                </div>
-                {selectedUser.branch && (
-                  <span className="shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full bg-muted text-muted-foreground border border-border">
-                    {selectedUser.branch}
-                  </span>
-                )}
-                <button
-                  onClick={() => { setSelectedUser(null); setUserSearchQuery(""); }}
-                  className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors"
-                  title="Change user"
-                >
-                  <XCircle className="w-4 h-4 text-muted-foreground/60 hover:text-foreground" />
-                </button>
-              </div>
-            ) : (
-              /* ── Search + results ── */
-              <div className="space-y-3">
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60" />
-                  <Input
-                    value={userSearchQuery}
-                    onChange={(e) => setUserSearchQuery(e.target.value)}
-                    placeholder="Search by name or email…"
-                    className="pl-9 h-9 text-sm"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Results list */}
-                <div className="rounded-lg border border-border overflow-hidden">
-                  <div className="max-h-[220px] overflow-y-auto divide-y divide-border">
-                    {loadingUsers ? (
-                      <div className="flex items-center justify-center gap-2 py-8">
-                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">Loading users…</span>
-                      </div>
-                    ) : userSearchQuery.trim().length < 2 ? (
-                      <div className="flex flex-col items-center justify-center py-8 gap-1">
-                        <Search className="w-5 h-5 text-muted-foreground/30" />
-                        <span className="text-xs text-muted-foreground/60">Type at least 2 characters to search</span>
-                      </div>
-                    ) : filteredUsers.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 gap-1">
-                        <Users className="w-5 h-5 text-muted-foreground/30" />
-                        <span className="text-xs text-muted-foreground/60">No matching users found</span>
-                      </div>
-                    ) : (
-                      filteredUsers.slice(0, 20).map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => setSelectedUser(u)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60 focus:bg-muted/60 outline-none"
-                        >
-                          <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-bold text-primary">
-                            {u.name?.charAt(0)?.toUpperCase() || "?"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium leading-tight truncate">{u.name}</p>
-                            <p className="text-[11px] text-muted-foreground leading-tight mt-0.5 truncate">{u.email}</p>
-                          </div>
-                          {u.branch && (
-                            <span className="shrink-0 text-[10px] text-muted-foreground/70">{u.branch}</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  {filteredUsers.length > 0 && (
-                    <div className="px-3 py-1.5 bg-muted/30 border-t border-border">
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} found
-                        {filteredUsers.length > 20 ? " · showing first 20" : ""}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Registration type — only after user selected */}
-            {selectedUser && (
-              <div className="mt-4 space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Registration Type</Label>
-                <Select value={regForm.registrationType} onValueChange={(v) => setRegForm((p) => ({ ...p, registrationType: v as RegistrationType }))}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Individual">Individual</SelectItem>
-                    <SelectItem value="Team">Team</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-6 py-4 mt-2 border-t border-border bg-muted/20">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              onClick={() => { setShowAddReg(false); setSelectedUser(null); setUserSearchQuery(""); }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 px-4 text-xs"
-              onClick={handleAddRegistration}
-              disabled={addingReg || !selectedUser}
-            >
-              {addingReg ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <UserPlus className="mr-1.5 h-3.5 w-3.5" />}
-              Register
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <ManagedEventEditDialog
         event={event}

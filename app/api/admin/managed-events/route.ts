@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { FieldValue } from "firebase-admin/firestore";
+import { computeEventStatus } from "@/lib/utils";
 
 const COLLECTION = "managed_events";
 
 /**
  * GET /api/admin/managed-events — List all managed events
+ * Auto-updates each event's status based on its start/end dates.
  */
 export async function GET() {
   try {
@@ -14,10 +16,21 @@ export async function GET() {
       .orderBy("createdAt", "desc")
       .get();
 
-    const events = snapshot.docs.map((doc) => ({
-      eventId: doc.id,
-      ...doc.data(),
-    }));
+    const batch = db.batch();
+    let hasUpdates = false;
+
+    const events = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const computed = computeEventStatus(data.startDate, data.endDate);
+      if (data.status !== computed) {
+        batch.update(doc.ref, { status: computed, updatedAt: FieldValue.serverTimestamp() });
+        hasUpdates = true;
+        data.status = computed;
+      }
+      return { eventId: doc.id, ...data };
+    });
+
+    if (hasUpdates) await batch.commit();
 
     return NextResponse.json(events);
   } catch (error) {
@@ -45,7 +58,7 @@ export async function POST(request: NextRequest) {
       endDate: body.endDate ?? null,
       venue: body.venue ?? "",
       mode: body.mode ?? "OFFLINE",
-      status: body.status ?? "DRAFT",
+      status: body.status ?? "UPCOMING",
       eventType: body.eventType ?? "WORKSHOP",
       maxParticipants: body.maxParticipants ?? 0,
       registrationStart: body.registrationStart ?? null,

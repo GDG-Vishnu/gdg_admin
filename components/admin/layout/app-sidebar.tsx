@@ -17,6 +17,7 @@ import {
   Link2,
   Image,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 import {
@@ -61,16 +62,16 @@ const menuItems = [
     url: "/admin/users",
     icon: UsersRound,
   },
-  {
-    title: "Forms",
-    url: "/admin/forms",
-    icon: FileText,
-  },
-  {
-    title: "Form Builder",
-    url: "/admin/form-builder",
-    icon: FileText,
-  },
+  // {
+  //   title: "Forms",
+  //   url: "/admin/forms",
+  //   icon: FileText,
+  // },
+  // {
+  //   title: "Form Builder",
+  //   url: "/admin/form-builder",
+  //   icon: FileText,
+  // },
   {
     title: "Image to Url",
     url: "/admin/image-to-url",
@@ -80,6 +81,11 @@ const menuItems = [
     title: "Gallery",
     url: "/admin/gallery",
     icon: Image,
+  },
+  {
+    title: "GDG Team",
+    url: "/admin/gdg-team",
+    icon: ShieldCheck,
   },
   {
     title: "Settings",

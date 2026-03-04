@@ -4,7 +4,7 @@
  */
 
 export type EventMode = "ONLINE" | "OFFLINE" | "HYBRID";
-export type EventStatus = "DRAFT" | "PUBLISHED" | "CLOSED" | "COMPLETED";
+export type EventStatus = "UPCOMING" | "ONGOING" | "COMPLETED";
 export type EventType = "WORKSHOP" | "HACKATHON";
 export type RegistrationType = "Individual" | "Team";
 
