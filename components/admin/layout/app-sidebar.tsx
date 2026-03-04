@@ -8,6 +8,7 @@ import {
   Users,
   UsersRound,
   Calendar,
+  CalendarCheck,
   Settings,
   BarChart3,
   Menu,
@@ -49,6 +50,11 @@ const menuItems = [
     title: "Events",
     url: "/admin/events",
     icon: Calendar,
+  },
+  {
+    title: "Event Manager",
+    url: "/admin/managed-events",
+    icon: CalendarCheck,
   },
   {
     title: "Users",

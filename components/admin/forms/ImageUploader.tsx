@@ -221,7 +221,7 @@ export function ImageUploader({ onUploadComplete }: ImageUploaderProps) {
                 type="text"
                 value={uploadedImage.url}
                 readOnly
-                className="w-full p-2 text-xs bg-white dark:bg-gray-900 border rounded"
+                className="w-full p-2 text-xs bg-background border rounded"
               />
               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <p>Format: {uploadedImage.format.toUpperCase()}</p>

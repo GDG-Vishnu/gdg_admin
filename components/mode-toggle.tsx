@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,22 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  // Render a neutral placeholder until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <div
+        className={cn(
+          "flex w-16 h-8 p-1 rounded-full border bg-white border-zinc-200",
+          className,
+        )}
+      />
+    );
+  }
+
   const isDark = resolvedTheme === "dark";
 
   return (

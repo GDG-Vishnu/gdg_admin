@@ -88,14 +88,17 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.6 0.15 150);
-  --primary-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.88 0 0);
+  --primary-foreground: oklch(0.13 0 0);
+  /* Override the inlined @theme inline values for dark mode */
+  --color-primary: oklch(0.88 0 0);
+  --color-primary-foreground: oklch(0.13 0 0);
   --secondary: oklch(0.9 0.15 75);
   --secondary-foreground: oklch(0.145 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.7 0.18 250);
-  --accent-foreground: oklch(0.145 0 0);
+  --accent: oklch(0.32 0 0);
+  --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -107,8 +110,8 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.6 0.15 150);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.88 0 0);
+  --sidebar-primary-foreground: oklch(0.13 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -120,12 +123,16 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply text-foreground;
-    background-color: #fff !important;
+    @apply bg-background text-foreground;
     background-image:
       linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+  .dark body {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   }
 }
 
@@ -197,4 +204,34 @@
 
 .google-loader-dot {
   animation: google-bounce 1.4s ease-in-out infinite both;
+}
+
+/* ── Dark-mode primary colour override ─────────────────────────────────────
+   Tailwind v4 @theme inline bakes the light-mode primary value into utility
+   classes at build time. These explicit overrides re-apply the neutral dark
+   primary at a higher specificity so buttons don't appear blue in dark mode.
+─────────────────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .dark .bg-primary {
+    background-color: oklch(0.88 0 0);
+  }
+  .dark .hover\:bg-primary\/90:hover {
+    background-color: oklch(0.79 0 0);
+  }
+  .dark .text-primary-foreground {
+    color: oklch(0.13 0 0);
+  }
+  .dark .text-primary {
+    color: oklch(0.88 0 0);
+  }
+  .dark .border-primary {
+    border-color: oklch(0.88 0 0);
+  }
+  .dark .bg-primary\/10 {
+    background-color: oklch(0.88 0 0 / 0.12);
+  }
+  .dark [data-sidebar="menu-button"][data-active="true"] {
+    background-color: oklch(0.88 0 0);
+    color: oklch(0.13 0 0);
+  }
 }

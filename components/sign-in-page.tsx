@@ -118,13 +118,13 @@ export function LoginPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-white">
+      <div className="flex-1 flex items-center justify-center bg-background">
         <div className="w-full max-w-md p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
               Welcome Back
             </h1>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Sign in to access the admin dashboard.
             </p>
           </div>
@@ -138,7 +138,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Email Address
               </label>
               <input
@@ -147,7 +147,7 @@ export function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="Email Address"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                className="w-full px-4 py-3 border border-border rounded-xl bg-background text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
                 required
                 disabled={isLoading}
                 autoComplete="email"
@@ -155,7 +155,7 @@ export function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Password
               </label>
               <div className="relative">
@@ -165,7 +165,7 @@ export function LoginPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Password"
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  className="w-full px-4 py-3 pr-12 border border-border rounded-xl bg-background text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
                   required
                   disabled={isLoading}
                   autoComplete="current-password"
@@ -173,26 +173,26 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-full"
                   tabIndex={-1}
                 >
                   {showPassword ? (
-                    <EyeOff className="w-5 h-5 text-gray-500" />
+                    <EyeOff className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <Eye className="w-5 h-5 text-gray-500" />
+                    <Eye className="w-5 h-5 text-muted-foreground" />
                   )}
                 </button>
               </div>
             </div>
 
             <div className="flex items-center">
-              <label className="flex items-center space-x-2 text-sm text-gray-600">
+              <label className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   name="rememberMe"
                   checked={formData.rememberMe}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+                  className="w-4 h-4 text-primary border-border rounded"
                   disabled={isLoading}
                 />
                 <span>Remember me</span>
@@ -202,7 +202,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-primary text-primary-foreground py-3 px-4 rounded-xl font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

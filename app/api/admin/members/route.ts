@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 
-// ISR revalidation — Next.js will cache this response for 1 hour in production
-export const revalidate = 3600;
+// Disable caching so the response always reflects the latest Firestore data
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -12,20 +12,65 @@ export async function GET() {
       .get();
 
     const members = snapshot.docs.map((doc) => ({
-      id: doc.id,
       ...doc.data(),
+      id: doc.id,
     }));
 
-    // Cache at CDN/browser level: fresh for 1hr, serve stale for up to 24hr while revalidating
-    return NextResponse.json(members, {
-      headers: {
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
-      },
-    });
+    return NextResponse.json(members);
   } catch (err) {
     console.error("Failed to fetch team members:", err);
     return NextResponse.json(
       { error: "Failed to fetch team members" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    // Validate required fields
+    if (!body.name || typeof body.name !== "string") {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 },
+      );
+    }
+
+    // Whitelist allowed fields to prevent injection of unexpected data
+    const allowedFields = [
+      "name",
+      "designation",
+      "position",
+      "imageUrl",
+      "linkedinUrl",
+      "mail",
+      "bgColor",
+      "logo",
+      "dept_logo",
+      "rank",
+      "dept_rank",
+    ];
+
+    const data: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (field in body) {
+        data[field] = body[field];
+      }
+    }
+
+    const docRef = await db.collection("team_members").add(data);
+    const newDoc = await docRef.get();
+
+    return NextResponse.json(
+      { id: newDoc.id, ...newDoc.data() },
+      { status: 201 },
+    );
+  } catch (err) {
+    console.error("Create member error:", err);
+    return NextResponse.json(
+      { error: "Failed to create team member" },
       { status: 500 },
     );
   }

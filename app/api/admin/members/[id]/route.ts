@@ -61,3 +61,31 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const docRef = db.collection("team_members").doc(id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return NextResponse.json(
+        { error: "Member not found" },
+        { status: 404 },
+      );
+    }
+
+    await docRef.delete();
+
+    return NextResponse.json({ message: "Member deleted successfully" });
+  } catch (err: unknown) {
+    console.error("Delete member error:", err);
+    return NextResponse.json(
+      { error: "Failed to delete member" },
+      { status: 500 },
+    );
+  }
+}
