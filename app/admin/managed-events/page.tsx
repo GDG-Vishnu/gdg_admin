@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/admin/layout/PageHeader";
 import {
@@ -75,7 +75,7 @@ function formatDate(d: string | null): string {
 
 
 
-export default function ManagedEventsPage() {
+function ManagedEventsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [events, setEvents] = useState<ManagedEvent[]>([]);
@@ -336,5 +336,13 @@ export default function ManagedEventsPage() {
         createdByEmail={currentUserEmail}
       />
     </div>
+  );
+}
+
+export default function ManagedEventsPage() {
+  return (
+    <Suspense>
+      <ManagedEventsContent />
+    </Suspense>
   );
 }
