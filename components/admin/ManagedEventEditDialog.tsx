@@ -47,9 +47,8 @@ import type {
 ───────────────────────────────────────────── */
 
 const STATUS_OPTIONS: { value: EventStatus; label: string; color: string }[] = [
-  { value: "DRAFT",     label: "Draft",     color: "bg-zinc-500" },
-  { value: "PUBLISHED", label: "Published", color: "bg-blue-500" },
-  { value: "CLOSED",    label: "Closed",    color: "bg-amber-500" },
+  { value: "UPCOMING",  label: "Upcoming",  color: "bg-blue-500" },
+  { value: "ONGOING",   label: "Ongoing",   color: "bg-amber-500" },
   { value: "COMPLETED", label: "Completed", color: "bg-green-500" },
 ];
 const MODE_OPTIONS: { value: EventMode; label: string }[] = [
@@ -103,7 +102,7 @@ type EditFormState = {
 const EMPTY_FORM: EditFormState = {
   title: "", description: "", bannerImage: "", posterImage: "",
   startDate: "", startTime: "", endDate: "", endTime: "",
-  venue: "", mode: "OFFLINE", status: "DRAFT", eventType: "WORKSHOP",
+  venue: "", mode: "OFFLINE", status: "UPCOMING", eventType: "WORKSHOP",
   maxParticipants: 0,
   regStartDate: "", regStartTime: "", regEndDate: "", regEndTime: "",
   isRegistrationOpen: false, createdBy: "",
@@ -156,7 +155,7 @@ function eventToForm(e: ManagedEvent): EditFormState {
     endTime:     toTimeInput(e.endDate),
     venue:       e.venue || "",
     mode:        e.mode || "OFFLINE",
-    status:      e.status || "DRAFT",
+    status:      e.status || "UPCOMING",
     eventType:   e.eventType || "WORKSHOP",
     maxParticipants: e.maxParticipants || 0,
     regStartDate:  toDateInput(e.registrationStart),

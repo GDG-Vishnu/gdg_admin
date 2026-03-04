@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { FieldValue } from "firebase-admin/firestore";
+import { computeEventStatus } from "@/lib/utils";
 
 const COLLECTION = "managed_events";
 
 /**
  * GET /api/admin/managed-events/[id] — Get a single managed event
+ * Auto-updates the event's status based on its start/end dates.
  */
 export async function GET(
   _request: NextRequest,
@@ -19,7 +21,14 @@ export async function GET(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ eventId: doc.id, ...doc.data() });
+    const data = doc.data()!;
+    const computed = computeEventStatus(data.startDate, data.endDate);
+    if (data.status !== computed) {
+      await doc.ref.update({ status: computed, updatedAt: FieldValue.serverTimestamp() });
+      data.status = computed;
+    }
+
+    return NextResponse.json({ eventId: doc.id, ...data });
   } catch (error) {
     console.error("Fetch managed event error:", error);
     return NextResponse.json(

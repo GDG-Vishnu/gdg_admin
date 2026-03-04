@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -289,7 +289,7 @@ const MOCK_FORMS: Record<string, FormConfig> = {
 
 import FormBuilder from "@/components/FormBuilder";
 
-export default function FormBuilderPage() {
+function FormBuilderContent() {
   const searchParams = useSearchParams();
   const formId = searchParams.get("id");
   const isEditMode = Boolean(formId);
@@ -999,5 +999,13 @@ export default function FormBuilderPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function FormBuilderPage() {
+  return (
+    <Suspense>
+      <FormBuilderContent />
+    </Suspense>
   );
 }
