@@ -5,6 +5,33 @@ import { computeEventStatus } from "@/lib/utils";
 
 const COLLECTION = "managed_events";
 
+/** Convert a Firestore Timestamp (or serialised {_seconds}) to an ISO string. */
+function tsToISO(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    if ("toDate" in (value as any) && typeof (value as any).toDate === "function") {
+      return (value as any).toDate().toISOString();
+    }
+    const secs = (value as any)._seconds ?? (value as any).seconds;
+    if (typeof secs === "number") return new Date(secs * 1000).toISOString();
+  }
+  return null;
+}
+
+/** Normalise all date fields on an event document to ISO strings. */
+function normaliseDates(data: Record<string, any>): Record<string, any> {
+  return {
+    ...data,
+    startDate: tsToISO(data.startDate),
+    endDate: tsToISO(data.endDate),
+    registrationStart: tsToISO(data.registrationStart),
+    registrationEnd: tsToISO(data.registrationEnd),
+    createdAt: tsToISO(data.createdAt),
+    updatedAt: tsToISO(data.updatedAt),
+  };
+}
+
 /**
  * GET /api/admin/managed-events/[id] — Get a single managed event
  * Auto-updates the event's status based on its start/end dates.
@@ -28,7 +55,7 @@ export async function GET(
       data.status = computed;
     }
 
-    return NextResponse.json({ eventId: doc.id, ...data });
+    return NextResponse.json({ eventId: doc.id, ...normaliseDates(data) });
   } catch (error) {
     console.error("Fetch managed event error:", error);
     return NextResponse.json(
@@ -66,6 +93,7 @@ export async function PATCH(
       "isRegistrationOpen",
       "tags",
       "keyHighlights",
+      "Theme",
       "eligibilityCriteria",
       "executiveBoard",
       "eventOfficials",
@@ -107,7 +135,7 @@ export async function PATCH(
     await docRef.update(data);
     const updated = await docRef.get();
 
-    return NextResponse.json({ eventId: updated.id, ...updated.data() });
+    return NextResponse.json({ eventId: updated.id, ...normaliseDates(updated.data() as Record<string, any>) });
   } catch (error) {
     console.error("Update managed event error:", error);
     return NextResponse.json(

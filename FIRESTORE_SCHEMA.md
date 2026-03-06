@@ -86,6 +86,7 @@ interface ManagedEvent {
   createdBy: string;                 // Admin email
   tags: string[];
   keyHighlights: string[];
+  Theme: string[];                    // Up to 5 hex color strings for event page theming
   eligibilityCriteria: {
     yearOfGrad: boolean[];
     Dept: string[];
@@ -161,6 +162,10 @@ interface GDGTeamMember {
   revokedAt: string | null;          // ISO string
   revokedBy: string | null;          // Admin UID who revoked
   revokedReason: string | null;
+
+  rejectedAt: string | null;         // ISO string
+  rejectedBy: string | null;         // Admin UID who rejected
+  rejectedReason: string | null;
 
   createdAt: string | null;          // ISO string
   updatedAt: string | null;          // ISO string

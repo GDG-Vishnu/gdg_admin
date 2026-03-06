@@ -107,20 +107,23 @@ export default function GDGTeamPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | AuthorizationStatus>("all");
   const [filterAccess, setFilterAccess] = useState<"all" | AccessLevel>("all");
-  const [activeTab, setActiveTab] = useState<"members" | "requests">("members");
+  const [activeTab, setActiveTab] = useState<"members" | "requests" | "rejected">("members");
   const [currentUserUid, setCurrentUserUid] = useState("");
 
   // Dialog states
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<GDGTeamMember | null>(null);
+  const [detailMember, setDetailMember] = useState<GDGTeamMember | null>(null);
 
   // Form states
   const [approveForm, setApproveForm] = useState({ position: "", designation: "", accessLevel: "member" as AccessLevel });
   const [editForm, setEditForm] = useState({ name: "", email: "", position: "", designation: "", accessLevel: "member" as AccessLevel, profilePicture: "" });
   const [revokeReason, setRevokeReason] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
   const [addForm, setAddForm] = useState({ name: "", email: "", position: "", designation: "", accessLevel: "member" as AccessLevel, profilePicture: "" });
 
   // Action loading states
@@ -188,17 +191,26 @@ export default function GDGTeamPage() {
     }
   }
 
-  async function handleReject(member: GDGTeamMember) {
+  async function handleReject() {
+    if (!selectedMember) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/admin/gdg-team/${member.id}`, {
+      const res = await fetch(`/api/admin/gdg-team/${selectedMember.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           authorizationStatus: "rejected",
+          rejectedAt: new Date().toISOString(),
+          rejectedBy: currentUserUid,
+          rejectedReason: rejectReason || null,
         }),
       });
-      if (res.ok) fetchMembers();
+      if (res.ok) {
+        setRejectDialogOpen(false);
+        setSelectedMember(null);
+        setRejectReason("");
+        fetchMembers();
+      }
     } catch {
       console.error("Reject failed");
     } finally {
@@ -302,9 +314,10 @@ export default function GDGTeamPage() {
   /* ─── Derived data ─── */
 
   const pendingMembers = members.filter((m) => m.authorizationStatus === "pending");
-  const nonPendingMembers = members.filter((m) => m.authorizationStatus !== "pending");
+  const rejectedMembers = members.filter((m) => m.authorizationStatus === "rejected");
+  const teamMembers = members.filter((m) => m.authorizationStatus === "approved" || m.authorizationStatus === "revoked");
 
-  const displayMembers = activeTab === "requests" ? pendingMembers : nonPendingMembers;
+  const displayMembers = activeTab === "requests" ? pendingMembers : activeTab === "rejected" ? rejectedMembers : teamMembers;
 
   const filteredMembers = displayMembers.filter((m) => {
     const matchSearch =
@@ -312,7 +325,7 @@ export default function GDGTeamPage() {
       m.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.position?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.designation?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = activeTab === "requests" || filterStatus === "all" || m.authorizationStatus === filterStatus;
+    const matchStatus = activeTab !== "members" || filterStatus === "all" || m.authorizationStatus === filterStatus;
     const matchAccess = filterAccess === "all" || m.accessLevel === filterAccess;
     return matchSearch && matchStatus && matchAccess;
   });
@@ -321,6 +334,7 @@ export default function GDGTeamPage() {
     { title: "Total Members", value: members.length, icon: Users },
     { title: "Approved", value: members.filter((m) => m.authorizationStatus === "approved").length, icon: UserCheck },
     { title: "Pending", value: pendingMembers.length, icon: Clock },
+    { title: "Rejected", value: members.filter((m) => m.authorizationStatus === "rejected").length, icon: X },
     { title: "Revoked", value: members.filter((m) => m.authorizationStatus === "revoked").length, icon: UserX },
   ];
 
@@ -349,6 +363,12 @@ export default function GDGTeamPage() {
     setSelectedMember(member);
     setRevokeReason("");
     setRevokeDialogOpen(true);
+  }
+
+  function openRejectDialog(member: GDGTeamMember) {
+    setSelectedMember(member);
+    setRejectReason("");
+    setRejectDialogOpen(true);
   }
 
   /* ─── Render ─── */
@@ -399,7 +419,7 @@ export default function GDGTeamPage() {
             <Users className="h-4 w-4" />
             Team Members
             <Badge variant="secondary" className="ml-1 text-xs">
-              {nonPendingMembers.length}
+              {teamMembers.length}
             </Badge>
           </button>
           <button
@@ -415,6 +435,22 @@ export default function GDGTeamPage() {
             {pendingMembers.length > 0 && (
               <Badge variant="destructive" className="ml-1 text-xs animate-pulse">
                 {pendingMembers.length}
+              </Badge>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("rejected")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === "rejected"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <X className="h-4 w-4" />
+            Rejected
+            {rejectedMembers.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {rejectedMembers.length}
               </Badge>
             )}
           </button>
@@ -439,7 +475,6 @@ export default function GDGTeamPage() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="revoked">Revoked</SelectItem>
               </SelectContent>
             </Select>
@@ -456,12 +491,12 @@ export default function GDGTeamPage() {
           </div>
         )}
 
-        {/* Search for requests tab */}
-        {activeTab === "requests" && (
+        {/* Search for requests/rejected tab */}
+        {(activeTab === "requests" || activeTab === "rejected") && (
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search pending requests..."
+              placeholder={activeTab === "requests" ? "Search pending requests..." : "Search rejected requests..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -485,14 +520,16 @@ export default function GDGTeamPage() {
               <div className="text-center">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
                 <p className="text-xl font-medium text-muted-foreground">
-                  {activeTab === "requests" ? "No pending requests" : "No team members found"}
+                  {activeTab === "requests" ? "No pending requests" : activeTab === "rejected" ? "No rejected requests" : "No team members found"}
                 </p>
                 <p className="text-sm text-muted-foreground/60 mt-1">
                   {activeTab === "requests"
                     ? "All login requests have been handled."
-                    : searchQuery || filterStatus !== "all" || filterAccess !== "all"
-                      ? "Try adjusting your filters."
-                      : "Add your first team member to get started."}
+                    : activeTab === "rejected"
+                      ? "No requests have been rejected yet."
+                      : searchQuery || filterStatus !== "all" || filterAccess !== "all"
+                        ? "Try adjusting your filters."
+                        : "Add your first team member to get started."}
                 </p>
               </div>
             </Card>
@@ -500,7 +537,7 @@ export default function GDGTeamPage() {
             /* ─── Pending Requests Cards ─── */
             <div className="grid gap-4">
               {filteredMembers.map((member) => (
-                <Card key={member.id} className="overflow-hidden transition-all duration-200 hover:shadow-md">
+                <Card key={member.id} className="overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer" onClick={() => setDetailMember(member)}>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-4">
                       {/* Avatar */}
@@ -541,7 +578,7 @@ export default function GDGTeamPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="sm"
                           variant="outline"
@@ -554,13 +591,114 @@ export default function GDGTeamPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleReject(member)}
+                          onClick={() => openRejectDialog(member)}
                           disabled={actionLoading}
                           className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
                         >
                           <X className="h-4 w-4 mr-1" />
                           Reject
                         </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : activeTab === "rejected" ? (
+            /* ─── Rejected Requests Cards ─── */
+            <div className="grid gap-4">
+              {filteredMembers.map((member) => (
+                <Card key={member.id} className="overflow-hidden transition-all duration-200 hover:shadow-md border-destructive/20 cursor-pointer" onClick={() => setDetailMember(member)}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-4">
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        {member.profilePicture ? (
+                          <img
+                            src={member.profilePicture}
+                            alt={member.name}
+                            className="w-14 h-14 rounded-full object-cover ring-2 ring-red-500/30 opacity-75"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center ring-2 ring-red-500/30">
+                            <span className="text-lg font-bold text-red-600">
+                              {member.name?.charAt(0)?.toUpperCase() || "?"}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                          <X className="w-3 h-3 text-white" />
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-semibold text-foreground truncate">{member.name}</h3>
+                          <Badge variant="destructive" className="text-xs">
+                            Rejected
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
+                          <Mail className="w-3.5 h-3.5" />
+                          <span className="truncate">{member.email}</span>
+                        </div>
+                        {member.rejectedReason && (
+                          <p className="text-xs text-destructive/80 mb-1">
+                            <span className="font-medium">Reason:</span> {member.rejectedReason}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>Requested on {formatDate(member.createdAt)}</span>
+                          <span>•</span>
+                          <span>Rejected on {formatDate(member.rejectedAt)}</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openApproveDialog(member)}
+                          className="border-green-600/50 text-green-600 hover:bg-green-600/10 hover:text-green-600 hover:border-green-600 dark:border-green-500/50 dark:text-green-500 dark:hover:bg-green-500/10 dark:hover:text-green-500 dark:hover:border-green-500"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Re-approve
+                        </Button>
+                        {confirmDeleteId === member.id ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDelete(member.id)}
+                              disabled={deletingId === member.id}
+                            >
+                              {deletingId === member.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "Delete"
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmDeleteId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmDeleteId(member.id)}
+                            className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -591,7 +729,7 @@ export default function GDGTeamPage() {
                       const AccessIcon = accessCfg.icon;
 
                       return (
-                        <tr key={member.id} className="group hover:bg-muted/30 transition-colors">
+                        <tr key={member.id} className="group hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setDetailMember(member)}>
                           {/* Member info */}
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
@@ -631,19 +769,32 @@ export default function GDGTeamPage() {
 
                           {/* Status */}
                           <td className="px-5 py-4">
-                            <Badge variant={statusCfg.variant} className="text-xs gap-1">
-                              <StatusIcon className="h-3 w-3" />
-                              {statusCfg.label}
-                            </Badge>
+                            <div>
+                              <Badge variant={statusCfg.variant} className="text-xs gap-1">
+                                <StatusIcon className="h-3 w-3" />
+                                {statusCfg.label}
+                              </Badge>
+                              {member.authorizationStatus === "revoked" && member.revokedReason && (
+                                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate" title={member.revokedReason}>
+                                  Reason: {member.revokedReason}
+                                </p>
+                              )}
+                            </div>
                           </td>
 
                           {/* Joined */}
                           <td className="px-5 py-4">
-                            <span className="text-xs text-muted-foreground">{formatDate(member.approvedAt || member.createdAt)}</span>
+                            <div>
+                              <span className="text-xs text-muted-foreground">
+                                {member.authorizationStatus === "revoked"
+                                  ? `Revoked ${formatDate(member.revokedAt)}`
+                                  : formatDate(member.approvedAt || member.createdAt)}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Actions */}
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => openEditDialog(member)}
@@ -663,7 +814,7 @@ export default function GDGTeamPage() {
                                 </button>
                               )}
 
-                              {(member.authorizationStatus === "rejected" || member.authorizationStatus === "revoked") && (
+                              {member.authorizationStatus === "revoked" && (
                                 <button
                                   onClick={() => openApproveDialog(member)}
                                   className="p-2 rounded-md text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
@@ -812,6 +963,46 @@ export default function GDGTeamPage() {
               >
                 {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldX className="h-4 w-4 mr-2" />}
                 Revoke Access
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Reject Dialog ─── */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <X className="h-5 w-5 text-red-600" />
+              Reject Request
+            </DialogTitle>
+            <DialogDescription>
+              Reject the join request from <strong>{selectedMember?.name}</strong>. Please provide a reason for rejection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Rejection Reason *</Label>
+              <Textarea
+                placeholder="Provide a reason for rejecting this request..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <Separator />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleReject}
+                disabled={actionLoading || !rejectReason.trim()}
+              >
+                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <X className="h-4 w-4 mr-2" />}
+                Reject Request
               </Button>
             </div>
           </div>
@@ -987,6 +1178,185 @@ export default function GDGTeamPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Member Detail Dialog ─── */}
+      <Dialog open={!!detailMember} onOpenChange={(open) => { if (!open) setDetailMember(null); }}>
+        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+          <DialogTitle className="sr-only">Member Details</DialogTitle>
+          {detailMember && (() => {
+            const statusCfg = STATUS_CONFIG[detailMember.authorizationStatus] || STATUS_CONFIG.pending;
+            const accessCfg = ACCESS_CONFIG[detailMember.accessLevel] || ACCESS_CONFIG.member;
+            const StatusIcon = statusCfg.icon;
+            const AccessIcon = accessCfg.icon;
+            return (
+              <>
+                {/* Header */}
+                <div className="px-6 pt-6 pb-4">
+                  <div className="flex items-center gap-4">
+                    {detailMember.profilePicture ? (
+                      <img src={detailMember.profilePicture} alt={detailMember.name} className="w-16 h-16 rounded-full object-cover ring-2 ring-primary/20" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-2 ring-primary/20">
+                        <span className="text-2xl font-bold text-primary">
+                          {detailMember.name?.charAt(0)?.toUpperCase() || "?"}
+                        </span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-lg font-semibold truncate">{detailMember.name}</h3>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span className="truncate">{detailMember.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant={statusCfg.variant} className="text-xs gap-1">
+                          <StatusIcon className="h-3 w-3" />
+                          {statusCfg.label}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <AccessIcon className="h-3 w-3" />
+                          {accessCfg.label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="px-6 pb-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Position</p>
+                      <p className="text-sm font-medium">{detailMember.position || "\u2013"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Designation</p>
+                      <p className="text-sm font-medium">{detailMember.designation || "\u2013"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Requested On</p>
+                      <p className="text-sm font-medium">{formatDate(detailMember.createdAt)}</p>
+                    </div>
+                    {detailMember.authorizationStatus === "approved" && (
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Approved At</p>
+                        <p className="text-sm font-medium">{formatDate(detailMember.approvedAt)}</p>
+                      </div>
+                    )}
+                    {detailMember.authorizationStatus === "rejected" && (
+                      <>
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Rejected At</p>
+                          <p className="text-sm font-medium">{formatDate(detailMember.rejectedAt)}</p>
+                        </div>
+                        {detailMember.rejectedReason && (
+                          <div className="col-span-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                            <p className="text-[10px] font-medium text-destructive uppercase tracking-wider mb-1">Rejection Reason</p>
+                            <p className="text-sm">{detailMember.rejectedReason}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {detailMember.authorizationStatus === "revoked" && (
+                      <>
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Revoked At</p>
+                          <p className="text-sm font-medium">{formatDate(detailMember.revokedAt)}</p>
+                        </div>
+                        {detailMember.revokedReason && (
+                          <div className="col-span-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                            <p className="text-[10px] font-medium text-destructive uppercase tracking-wider mb-1">Revoke Reason</p>
+                            <p className="text-sm">{detailMember.revokedReason}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">User ID</p>
+                    <p className="text-xs font-mono text-muted-foreground break-all">{detailMember.userId}</p>
+                  </div>
+                  {detailMember.updatedAt && (
+                    <p className="text-xs text-muted-foreground text-right">Last updated: {formatDate(detailMember.updatedAt)}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        const m = detailMember;
+                        setDetailMember(null);
+                        openEditDialog(m);
+                      }}
+                    >
+                      <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+                    </Button>
+                    {detailMember.authorizationStatus === "approved" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-amber-600/50 text-amber-600 hover:bg-amber-600/10 hover:border-amber-600"
+                        onClick={() => {
+                          const m = detailMember;
+                          setDetailMember(null);
+                          openRevokeDialog(m);
+                        }}
+                      >
+                        <ShieldX className="mr-1.5 h-3.5 w-3.5" /> Revoke
+                      </Button>
+                    )}
+                    {(detailMember.authorizationStatus === "rejected" || detailMember.authorizationStatus === "revoked" || detailMember.authorizationStatus === "pending") && (
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs border-green-600/50 text-green-600 hover:bg-green-600/10 hover:border-green-600 dark:border-green-500/50 dark:text-green-500"
+                        variant="outline"
+                        onClick={() => {
+                          const m = detailMember;
+                          setDetailMember(null);
+                          openApproveDialog(m);
+                        }}
+                      >
+                        <Check className="mr-1.5 h-3.5 w-3.5" /> {detailMember.authorizationStatus === "pending" ? "Approve" : "Re-approve"}
+                      </Button>
+                    )}
+                    {detailMember.authorizationStatus === "pending" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:border-destructive"
+                        onClick={() => {
+                          const m = detailMember;
+                          setDetailMember(null);
+                          openRejectDialog(m);
+                        }}
+                      >
+                        <X className="mr-1.5 h-3.5 w-3.5" /> Reject
+                      </Button>
+                    )}
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => {
+                      const id = detailMember.id;
+                      setDetailMember(null);
+                      setConfirmDeleteId(id);
+                    }}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

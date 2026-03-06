@@ -27,6 +27,10 @@ export interface GDGTeamMember {
   revokedBy: string | null;
   revokedReason: string | null;
 
+  rejectedAt: string | null;
+  rejectedBy: string | null;
+  rejectedReason: string | null;
+
   createdAt: string | null;
   updatedAt: string | null;
 }

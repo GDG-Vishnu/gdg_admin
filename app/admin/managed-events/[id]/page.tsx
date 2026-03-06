@@ -36,6 +36,7 @@ import {
   ExternalLink,
   CheckCircle,
   ClipboardList,
+  Palette,
 } from "lucide-react";
 import GoogleLoader from "@/components/GoogleLoader";
 import { ManagedEventEditDialog } from "@/components/admin/ManagedEventEditDialog";
@@ -50,28 +51,36 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: "bg-green-500",
 };
 
-function formatDate(d: string | null): string {
-  if (!d) return "TBD";
+function parseDate(d: string | null): Date | null {
+  if (!d) return null;
   try {
-    if (typeof d === "object" && (d as any)?._seconds) {
-      return new Date((d as any)._seconds * 1000).toLocaleString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    return new Date(d).toLocaleString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const date = typeof d === "object" && (d as any)?._seconds
+      ? new Date((d as any)._seconds * 1000)
+      : new Date(d);
+    return isNaN(date.getTime()) ? null : date;
   } catch {
-    return "TBD";
+    return null;
   }
+}
+
+function formatDate(d: string | null): string {
+  const date = parseDate(d);
+  if (!date) return "TBD";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function formatDateTime(d: string | null): string {
+  const date = parseDate(d);
+  if (!date) return "TBD";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 export default function ManagedEventDetailPage() {
@@ -227,8 +236,8 @@ export default function ManagedEventDetailPage() {
         {/* ── Inline stat bar ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {[
-            { icon: Calendar, label: "Starts", value: formatDate(event.startDate), color: "text-primary", bg: "bg-primary/8" },
-            { icon: CalendarClock, label: "Ends", value: formatDate(event.endDate), color: "text-violet-500", bg: "bg-violet-500/8" },
+            { icon: Calendar, label: "Starts", value: formatDateTime(event.startDate), color: "text-primary", bg: "bg-primary/8" },
+            { icon: CalendarClock, label: "Ends", value: formatDateTime(event.endDate), color: "text-violet-500", bg: "bg-violet-500/8" },
             { icon: MapPin,    label: "Venue",  value: event.venue || "TBD",         color: "text-sky-500", bg: "bg-sky-500/8" },
             { icon: Users,     label: "Mode / Type",
               value: `${event.mode} · ${event.eventType}`,
@@ -262,9 +271,9 @@ export default function ManagedEventDetailPage() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {event.registrationStart && event.registrationEnd
-                      ? `${formatDate(event.registrationStart)} — ${formatDate(event.registrationEnd)}`
+                      ? `${formatDateTime(event.registrationStart)} — ${formatDateTime(event.registrationEnd)}`
                       : event.registrationStart
-                        ? `Opens ${formatDate(event.registrationStart)}`
+                        ? `Opens ${formatDateTime(event.registrationStart)}`
                         : "No registration window configured"}
                   </p>
                 </div>
@@ -314,8 +323,8 @@ export default function ManagedEventDetailPage() {
                   ["Mode",            event.mode],
                   ["Max Capacity",    event.maxParticipants ? String(event.maxParticipants) : "Unlimited"],
                   ["Created By",      event.createdBy || "–"],
-                  ["Event Start",     formatDate(event.startDate)],
-                  ...(event.endDate ? [["Event End", formatDate(event.endDate)] as [string, string]] : []),
+                  ["Event Start",     formatDateTime(event.startDate)],
+                  ...(event.endDate ? [["Event End", formatDateTime(event.endDate)] as [string, string]] : []),
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                     <span className="text-muted-foreground text-xs flex-shrink-0">{k}</span>
@@ -408,9 +417,31 @@ export default function ManagedEventDetailPage() {
                 </div>
               </div>
             )}
-          </div>
 
-          {/* RIGHT: officials · faqs · rules */}
+            {/* Theme Colors */}
+            {event.Theme && event.Theme.length > 0 && (
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+                  <Palette className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Theme Colors</span>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    {event.Theme.map((color: string, i: number) => (
+                      <div key={i} className="flex flex-col items-center gap-1">
+                        <div
+                          className="w-10 h-10 rounded-lg border border-border shadow-sm"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                        <span className="text-[9px] font-mono text-muted-foreground">{color}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="lg:col-span-2 space-y-4">
 
             {/* Officials */}

@@ -7,6 +7,26 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Safely parse a date value that could be an ISO string, Firestore Timestamp,
+ * or serialised { _seconds } object into a JS Date.
+ */
+function parseAnyDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "object") {
+    if ("toDate" in (value as any) && typeof (value as any).toDate === "function") {
+      return (value as any).toDate();
+    }
+    const secs = (value as any)._seconds ?? (value as any).seconds;
+    if (typeof secs === "number") return new Date(secs * 1000);
+  }
+  return null;
+}
+
+/**
  * Derives the correct EventStatus purely from the event's start/end dates
  * relative to now. Used for automatic status updates.
  *
@@ -16,15 +36,15 @@ export function cn(...inputs: ClassValue[]) {
  *  - now > endDate (or no endDate) → COMPLETED  (no endDate = indefinitely ongoing → ONGOING)
  */
 export function computeEventStatus(
-  startDate: string | null | undefined,
-  endDate: string | null | undefined,
+  startDate: unknown,
+  endDate: unknown,
 ): EventStatus {
-  if (!startDate) return "UPCOMING";
+  const start = parseAnyDate(startDate);
+  if (!start) return "UPCOMING";
   const now = new Date();
-  const start = new Date(startDate);
   if (now < start) return "UPCOMING";
-  if (endDate) {
-    const end = new Date(endDate);
+  const end = parseAnyDate(endDate);
+  if (end) {
     if (now <= end) return "ONGOING";
     return "COMPLETED";
   }
