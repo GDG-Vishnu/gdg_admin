@@ -4,6 +4,20 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const COLLECTION = "managed_events";
 
+/** Convert a Firestore Timestamp (or serialised {_seconds}) to an ISO string. */
+function tsToISO(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    if ("toDate" in (value as any) && typeof (value as any).toDate === "function") {
+      return (value as any).toDate().toISOString();
+    }
+    const secs = (value as any)._seconds ?? (value as any).seconds;
+    if (typeof secs === "number") return new Date(secs * 1000).toISOString();
+  }
+  return null;
+}
+
 /**
  * GET /api/admin/managed-events/[id]/registrations — List registrations for an event
  */
@@ -26,10 +40,15 @@ export async function GET(
       .orderBy("registeredAt", "desc")
       .get();
 
-    const registrations = snapshot.docs.map((doc) => ({
-      regId: doc.id,
-      ...doc.data(),
-    }));
+    const registrations = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        regId: doc.id,
+        ...data,
+        registeredAt: tsToISO(data.registeredAt),
+        checkedInAt: tsToISO(data.checkedInAt),
+      };
+    });
 
     return NextResponse.json(registrations);
   } catch (error) {

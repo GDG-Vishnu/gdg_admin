@@ -51,24 +51,36 @@ const STATUS_LABELS: Record<EventStatus, string> = {
 };
 
 
-function formatDate(d: string | null): string {
-  if (!d) return "TBD";
+function parseDate(d: string | null): Date | null {
+  if (!d) return null;
   try {
-    if (typeof d === "object" && (d as any)?._seconds) {
-      return new Date((d as any)._seconds * 1000).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    }
-    return new Date(d).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    const date = typeof d === "object" && (d as any)?._seconds
+      ? new Date((d as any)._seconds * 1000)
+      : new Date(d);
+    return isNaN(date.getTime()) ? null : date;
   } catch {
-    return "TBD";
+    return null;
   }
+}
+
+function formatDate(d: string | null): string {
+  const date = parseDate(d);
+  if (!date) return "TBD";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function formatDateTime(d: string | null): string {
+  const date = parseDate(d);
+  if (!date) return "TBD";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 
@@ -394,7 +406,7 @@ function ManagedEventsContent() {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-border/40">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3 text-primary/70" />
-                <span>{formatDate(event.startDate)}</span>
+                <span>{formatDateTime(event.startDate)}</span>
               </div>
               {event.venue && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

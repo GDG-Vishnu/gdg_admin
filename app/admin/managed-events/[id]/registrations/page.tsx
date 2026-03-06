@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/admin/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -43,9 +43,25 @@ import {
   Filter,
   UserRound,
   UsersRound,
-  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Phone,
+  GraduationCap,
+  Globe,
+  Github,
+  Linkedin,
+  Twitter,
   ExternalLink,
+  ShieldAlert,
+  Calendar,
+  Briefcase,
+  FileText,
+  Mail,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import GoogleLoader from "@/components/GoogleLoader";
 import type {
   ManagedEvent,
@@ -53,30 +69,118 @@ import type {
   RegistrationType,
 } from "@/lib/types/managed-event";
 
+/* ── Client User type (from client_users collection) ── */
+interface ClientUser {
+  id: string;
+  name: string;
+  email: string;
+  profileUrl: string;
+  resumeUrl: string;
+  phoneNumber: string;
+  branch: string;
+  graduationYear: number | null;
+  role: string;
+  isBlocked: boolean;
+  profileCompleted: boolean;
+  participations: string[];
+  socialMedia: {
+    linkedin?: string;
+    github?: string;
+    twitter?: string;
+    [key: string]: string | undefined;
+  };
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/* ── SVG Donut Ring Component ── */
+
+function DonutRing({
+  value,
+  max,
+  size = 120,
+  strokeWidth = 10,
+  color,
+  bgColor = "hsl(var(--muted))",
+  label,
+  sublabel,
+}: {
+  value: number;
+  max: number;
+  size?: number;
+  strokeWidth?: number;
+  color: string;
+  bgColor?: string;
+  label: string;
+  sublabel: string;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = max > 0 ? Math.min(value / max, 1) : 0;
+  const offset = circumference * (1 - pct);
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={bgColor}
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold tabular-nums leading-none">
+            {max > 0 ? Math.round(pct * 100) : 0}%
+          </span>
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="text-sm font-semibold leading-tight">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{sublabel}</p>
+      </div>
+    </div>
+  );
+}
+
 /* ── Helpers ── */
 
-function formatDate(d: string | null): string {
-  if (!d) return "TBD";
+function parseDate(d: string | null): Date | null {
+  if (!d) return null;
   try {
-    if (typeof d === "object" && (d as any)?._seconds) {
-      return new Date((d as any)._seconds * 1000).toLocaleString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    return new Date(d).toLocaleString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const date = typeof d === "object" && (d as any)?._seconds
+      ? new Date((d as any)._seconds * 1000)
+      : new Date(d);
+    return isNaN(date.getTime()) ? null : date;
   } catch {
-    return "TBD";
+    return null;
   }
+}
+
+function formatDate(d: string | null): string {
+  const date = parseDate(d);
+  if (!date) return "TBD";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 /* ── Page ── */
@@ -121,12 +225,50 @@ export default function RegistrationsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "Individual" | "Team">("all");
   const [checkInFilter, setCheckInFilter] = useState<"all" | "checked-in" | "not-checked-in">("all");
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Actions
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [confirmDeleteRegId, setConfirmDeleteRegId] = useState<string | null>(null);
   const [deletingRegId, setDeletingRegId] = useState<string | null>(null);
   const [togglingRegOpen, setTogglingRegOpen] = useState(false);
   const [bulkChecking, setBulkChecking] = useState(false);
+
+  // Detail dialog
+  const [detailReg, setDetailReg] = useState<(RegisteredMember & { regId: string }) | null>(null);
+  const [detailUser, setDetailUser] = useState<ClientUser | null>(null);
+  const [detailUserLoading, setDetailUserLoading] = useState(false);
+  const [detailUserError, setDetailUserError] = useState<string | null>(null);
+
+  // Fetch full user details when detail dialog opens
+  useEffect(() => {
+    if (!detailReg?.userId) {
+      setDetailUser(null);
+      setDetailUserError(null);
+      return;
+    }
+    let cancelled = false;
+    setDetailUserLoading(true);
+    setDetailUserError(null);
+    setDetailUser(null);
+    fetch(`/api/admin/users/${detailReg.userId}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("User not found");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setDetailUser(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setDetailUserError(err.message || "Failed to fetch user");
+      })
+      .finally(() => {
+        if (!cancelled) setDetailUserLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [detailReg?.userId]);
 
   /* ── Data fetching ── */
 
@@ -160,16 +302,16 @@ export default function RegistrationsPage() {
     fetchRegistrations();
   }, [fetchEvent, fetchRegistrations]);
 
-  // Fetch client users when add-reg dialog opens
+  // Eagerly fetch client users on mount (needed for branch stats & add-reg dialog)
   useEffect(() => {
-    if (!showAddReg || allClientUsers.length > 0) return;
+    if (allClientUsers.length > 0) return;
     setLoadingUsers(true);
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setAllClientUsers(data); })
       .catch(() => console.error("Failed to load users"))
       .finally(() => setLoadingUsers(false));
-  }, [showAddReg, allClientUsers.length]);
+  }, [allClientUsers.length]);
 
   /* ── Derived state ── */
 
@@ -200,6 +342,50 @@ export default function RegistrationsPage() {
   const teamCount = registrations.filter((r) => r.registrationType === "Team").length;
   const capacityPercent = event?.maxParticipants ? Math.round((registrations.length / event.maxParticipants) * 100) : 0;
   const checkInPercent = registrations.length > 0 ? Math.round((checkedInCount / registrations.length) * 100) : 0;
+
+  // Registration timeline – group by date for mini bar chart
+  const timeline = useMemo(() => {
+    if (registrations.length === 0) return [];
+    const counts: Record<string, number> = {};
+    registrations.forEach((r) => {
+      if (!r.registeredAt) return;
+      try {
+        const d = typeof r.registeredAt === "object" && (r.registeredAt as any)?._seconds
+          ? new Date((r.registeredAt as any)._seconds * 1000)
+          : new Date(r.registeredAt);
+        const key = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+        counts[key] = (counts[key] || 0) + 1;
+      } catch { /* skip bad dates */ }
+    });
+    return Object.entries(counts).map(([date, count]) => ({ date, count }));
+  }, [registrations]);
+  const maxTimelineCount = Math.max(...timeline.map((t) => t.count), 1);
+
+  // Branch-wise registration breakdown
+  const branchStats = useMemo(() => {
+    if (registrations.length === 0 || allClientUsers.length === 0) return [];
+    const userBranchMap = new Map<string, string>();
+    allClientUsers.forEach((u) => {
+      if (u.branch) userBranchMap.set(u.id, u.branch);
+    });
+    const counts: Record<string, number> = {};
+    registrations.forEach((r) => {
+      const branch = userBranchMap.get(r.userId) || "Unknown";
+      counts[branch] = (counts[branch] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([branch, count]) => ({ branch, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [registrations, allClientUsers]);
+  const maxBranchCount = Math.max(...branchStats.map((b) => b.count), 1);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredRegs.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedRegs = filteredRegs.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, typeFilter, checkInFilter]);
 
   /* ── Handlers ── */
 
@@ -410,86 +596,170 @@ export default function RegistrationsPage() {
           </div>
         </div>
 
-        {/* ── Stat Cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-
-          {/* Total Registered */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Registered</span>
+        {/* ── Analytics Dashboard ── */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Registration Analytics</span>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+              <span><strong className="text-foreground">{registrations.length}</strong> registered</span>
+              <span className="w-px h-3 bg-border" />
+              <span><strong className="text-foreground">{checkedInCount}</strong> checked in</span>
+              <span className="w-px h-3 bg-border" />
+              <span><strong className="text-foreground">{individualCount}</strong> individual</span>
+              <span className="w-px h-3 bg-border" />
+              <span><strong className="text-foreground">{teamCount}</strong> team</span>
             </div>
-            <p className="text-2xl font-bold tabular-nums">
-              {registrations.length}
-              {event.maxParticipants > 0 && (
-                <span className="text-sm font-normal text-muted-foreground"> / {event.maxParticipants}</span>
+          </div>
+
+          <div className="p-5 grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.5fr] gap-6">
+
+            {/* ─ Left: Donut Rings ─ */}
+            <div className="flex items-center justify-center gap-8">
+              <DonutRing
+                value={registrations.length}
+                max={event.maxParticipants || registrations.length || 1}
+                color={capacityPercent > 90 ? "#ef4444" : capacityPercent > 70 ? "#f59e0b" : "#10b981"}
+                label="Capacity"
+                sublabel={`${registrations.length}${event.maxParticipants > 0 ? ` / ${event.maxParticipants}` : ""} slots`}
+              />
+              <DonutRing
+                value={checkedInCount}
+                max={registrations.length || 1}
+                color="#10b981"
+                label="Check-in"
+                sublabel={`${checkedInCount} of ${registrations.length}`}
+              />
+            </div>
+
+            {/* ─ Center: Type Breakdown ─ */}
+            <div className="flex flex-col justify-center gap-4">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Registration Type Split</p>
+
+              {/* Stacked horizontal bar */}
+              <div className="space-y-2">
+                <div className="h-5 rounded-full overflow-hidden bg-muted flex">
+                  {registrations.length > 0 && (
+                    <>
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-500 flex items-center justify-center"
+                        style={{ width: `${(individualCount / registrations.length) * 100}%` }}
+                      >
+                        {individualCount > 0 && (
+                          <span className="text-[9px] font-bold text-white px-1 truncate">{Math.round((individualCount / registrations.length) * 100)}%</span>
+                        )}
+                      </div>
+                      <div
+                        className="h-full bg-violet-500 transition-all duration-500 flex items-center justify-center"
+                        style={{ width: `${(teamCount / registrations.length) * 100}%` }}
+                      >
+                        {teamCount > 0 && (
+                          <span className="text-[9px] font-bold text-white px-1 truncate">{Math.round((teamCount / registrations.length) * 100)}%</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+                    <span className="text-xs text-muted-foreground">Individual</span>
+                    <span className="text-xs font-bold tabular-nums">{individualCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-violet-500" />
+                    <span className="text-xs text-muted-foreground">Team</span>
+                    <span className="text-xs font-bold tabular-nums">{teamCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Check-in breakdown mini bars */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Check-in Status</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground w-16 shrink-0">Checked In</span>
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${checkInPercent}%` }} />
+                  </div>
+                  <span className="text-[10px] font-semibold tabular-nums w-8 text-right">{checkedInCount}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground w-16 shrink-0">Pending</span>
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${registrations.length > 0 ? 100 - checkInPercent : 0}%` }} />
+                  </div>
+                  <span className="text-[10px] font-semibold tabular-nums w-8 text-right">{registrations.length - checkedInCount}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ─ Right: Registration Timeline ─ */}
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Registration Timeline</p>
+              {timeline.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground/40">
+                  No registrations yet
+                </div>
+              ) : (
+                <div className="flex-1 flex items-end gap-1 min-h-[100px]">
+                  {timeline.map((t, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative min-w-0">
+                      {/* Tooltip */}
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded bg-foreground text-background text-[9px] font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                        {t.count} reg{t.count !== 1 ? "s" : ""}
+                      </div>
+                      {/* Bar */}
+                      <div
+                        className="w-full rounded-t-sm bg-primary/80 hover:bg-primary transition-all duration-300 min-h-[4px]"
+                        style={{
+                          height: `${Math.max(8, (t.count / maxTimelineCount) * 90)}%`,
+                        }}
+                      />
+                      {/* Label */}
+                      <span className="text-[8px] text-muted-foreground/60 leading-none truncate w-full text-center">{t.date}</span>
+                    </div>
+                  ))}
+                </div>
               )}
-            </p>
-            {event.maxParticipants > 0 && (
-              <div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      capacityPercent > 90 ? "bg-red-500" : capacityPercent > 70 ? "bg-amber-500" : "bg-emerald-500"
-                    }`}
-                    style={{ width: `${Math.min(100, capacityPercent)}%` }}
-                  />
+            </div>
+          </div>
+
+          {/* ── Branch-wise Registration Breakdown ── */}
+          <div className="px-5 pb-5">
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Branch-wise Registrations</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">{capacityPercent}% capacity filled</p>
+                <span className="text-[10px] text-muted-foreground">{branchStats.length} branches</span>
               </div>
-            )}
-          </div>
-
-          {/* Checked In */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Checked In</span>
-            </div>
-            <p className="text-2xl font-bold tabular-nums">
-              {checkedInCount}
-              <span className="text-sm font-normal text-muted-foreground"> / {registrations.length}</span>
-            </p>
-            {registrations.length > 0 && (
-              <div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${checkInPercent}%` }} />
+              {branchStats.length === 0 ? (
+                <div className="flex items-center justify-center py-6 text-xs text-muted-foreground/40">
+                  {loadingUsers ? "Loading branch data..." : registrations.length === 0 ? "No registrations yet" : "No branch data available"}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">{checkInPercent}% check-in rate</p>
-              </div>
-            )}
-          </div>
-
-          {/* Individual */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <UserRound className="w-4 h-4 text-blue-500" />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Individual</span>
+              ) : (
+                <div className="space-y-2">
+                  {branchStats.map((b) => {
+                    const pct = registrations.length > 0 ? Math.round((b.count / registrations.length) * 100) : 0;
+                    return (
+                      <div key={b.branch} className="flex items-center gap-3 group">
+                        <span className="text-xs font-medium text-muted-foreground w-20 shrink-0 truncate" title={b.branch}>{b.branch}</span>
+                        <div className="flex-1 h-5 rounded-md bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-md bg-primary/70 group-hover:bg-primary transition-all duration-500 flex items-center justify-end"
+                            style={{ width: `${Math.max(8, (b.count / maxBranchCount) * 100)}%` }}
+                          >
+                            <span className="text-[9px] font-bold text-primary-foreground px-2 truncate">{b.count}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-semibold tabular-nums text-muted-foreground w-10 text-right">{pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <p className="text-2xl font-bold tabular-nums">{individualCount}</p>
-            {registrations.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">{Math.round((individualCount / registrations.length) * 100)}% of registrations</p>
-            )}
-          </div>
-
-          {/* Team */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                <UsersRound className="w-4 h-4 text-violet-500" />
-              </div>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Team</span>
-            </div>
-            <p className="text-2xl font-bold tabular-nums">{teamCount}</p>
-            {registrations.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">{Math.round((teamCount / registrations.length) * 100)}% of registrations</p>
-            )}
           </div>
         </div>
 
@@ -583,10 +853,14 @@ export default function RegistrationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRegs.map((reg, idx) => (
-                    <TableRow key={reg.regId || `reg-${idx}`} className="text-sm group">
+                  {paginatedRegs.map((reg, idx) => (
+                    <TableRow
+                      key={reg.regId || `reg-${idx}`}
+                      className="text-sm group cursor-pointer"
+                      onClick={() => setDetailReg(reg)}
+                    >
                       <TableCell className="text-center text-xs text-muted-foreground tabular-nums py-2.5">
-                        {idx + 1}
+                        {(safePage - 1) * pageSize + idx + 1}
                       </TableCell>
                       <TableCell className="font-medium py-2.5">
                         <div className="flex items-center gap-2">
@@ -614,7 +888,7 @@ export default function RegistrationsPage() {
                       </TableCell>
                       <TableCell className="text-center py-2.5">
                         <button
-                          onClick={() => handleToggleCheckIn(reg.regId, reg.isCheckedIn)}
+                          onClick={(e) => { e.stopPropagation(); handleToggleCheckIn(reg.regId, reg.isCheckedIn); }}
                           disabled={togglingId === reg.regId}
                           className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-muted transition-colors"
                           title={reg.isCheckedIn ? "Mark as not checked in" : "Mark as checked in"}
@@ -631,7 +905,7 @@ export default function RegistrationsPage() {
                       <TableCell className="text-xs text-muted-foreground py-2.5 hidden lg:table-cell">
                         {reg.isCheckedIn && reg.checkedInAt ? formatDate(reg.checkedInAt) : "–"}
                       </TableCell>
-                      <TableCell className="text-right py-2.5">
+                      <TableCell className="text-right py-2.5" onClick={(e) => e.stopPropagation()}>
                         {confirmDeleteRegId === reg.regId ? (
                           <div className="flex items-center justify-end gap-1">
                             <button
@@ -661,26 +935,358 @@ export default function RegistrationsPage() {
             </div>
           )}
 
-          {/* Table footer */}
+          {/* Table footer with pagination */}
           {!regLoading && (
-            <div className="px-5 py-3 border-t border-border bg-muted/10 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Showing {filteredRegs.length} of {registrations.length} registration{registrations.length !== 1 ? "s" : ""}
-              </span>
-              {(typeFilter !== "all" || checkInFilter !== "all" || search) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => { setSearch(""); setTypeFilter("all"); setCheckInFilter("all"); }}
-                >
-                  <Filter className="mr-1 h-3 w-3" /> Clear Filters
-                </Button>
-              )}
+            <div className="px-5 py-3 border-t border-border bg-muted/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Showing {filteredRegs.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filteredRegs.length)} of {filteredRegs.length}
+                  {filteredRegs.length !== registrations.length && (
+                    <span className="text-muted-foreground/50"> (filtered from {registrations.length})</span>
+                  )}
+                </span>
+                {(typeFilter !== "all" || checkInFilter !== "all" || search) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => { setSearch(""); setTypeFilter("all"); setCheckInFilter("all"); }}
+                  >
+                    <Filter className="mr-1 h-2.5 w-2.5" /> Clear Filters
+                  </Button>
+                )}
+              </div>
+
+              {/* Pagination controls */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 mr-2">
+                  <span className="text-[10px] text-muted-foreground">Rows:</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-7 w-[60px] text-[11px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <span className="text-[11px] text-muted-foreground tabular-nums mr-1">
+                  Page {safePage} of {totalPages}
+                </span>
+
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safePage <= 1}
+                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="First page"
+                  >
+                    <ChevronsLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Previous page"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Page number buttons */}
+                  {(() => {
+                    const pages: number[] = [];
+                    const start = Math.max(1, safePage - 2);
+                    const end = Math.min(totalPages, safePage + 2);
+                    for (let i = start; i <= end; i++) pages.push(i);
+                    return pages.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`w-7 h-7 rounded text-[11px] font-medium transition-colors ${
+                          p === safePage
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ));
+                  })()}
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Next page"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safePage >= totalPages}
+                    className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Last page"
+                  >
+                    <ChevronsRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Registration Detail Dialog ── */}
+      <Dialog open={!!detailReg} onOpenChange={(open) => { if (!open) setDetailReg(null); }}>
+        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
+          <DialogTitle className="sr-only">Registration Details</DialogTitle>
+          {detailReg && (
+            <>
+              {/* ── Header ── */}
+              <div className="flex items-start gap-4 px-6 pt-6 pb-4 border-b border-border">
+                {/* Avatar */}
+                {detailUser?.profileUrl ? (
+                  <img
+                    src={detailUser.profileUrl}
+                    alt={detailReg.name}
+                    className="w-14 h-14 rounded-full object-cover ring-1 ring-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground ring-1 ring-border shrink-0">
+                    {detailReg.name?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                )}
+
+                {/* Name + badges */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-semibold truncate">{detailReg.name}</h3>
+                    <span className={`px-2 py-0.5 text-[11px] font-medium rounded-md border ${
+                      detailReg.registrationType === "Team"
+                        ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20"
+                        : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
+                    }`}>
+                      {detailReg.registrationType}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border ${
+                      detailReg.isCheckedIn
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+                        : "bg-muted text-muted-foreground border-border"
+                    }`}>
+                      {detailReg.isCheckedIn ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      {detailReg.isCheckedIn ? "Checked In" : "Not Checked In"}
+                    </span>
+                    {detailUser?.isBlocked && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md bg-red-50 text-red-700 border border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20">
+                        <ShieldAlert className="w-3 h-3" /> Blocked
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate mt-0.5">{detailReg.email}</p>
+                  {detailUser && (
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">{detailUser.role}</Badge>
+                      {detailUser.profileCompleted && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-emerald-600 border-emerald-200 dark:text-emerald-400 dark:border-emerald-500/20">Profile Complete</Badge>
+                      )}
+                      {detailUser.branch && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{detailUser.branch}</Badge>
+                      )}
+                      {detailUser.graduationYear && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{detailUser.graduationYear}</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Body: two-column layout ── */}
+              <div className="overflow-y-auto max-h-[calc(85vh-180px)]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 sm:divide-x divide-border">
+
+                  {/* Left column — Registration Info */}
+                  <div className="px-6 py-4 space-y-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Registration Info</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-muted-foreground">Reg. Phone</span>
+                        <span className="text-sm font-medium font-mono">{detailReg.phone || "–"}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-muted-foreground">Type</span>
+                        <span className="text-sm font-medium">{detailReg.registrationType}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-muted-foreground">Registered At</span>
+                        <span className="text-sm font-medium">{formatDate(detailReg.registeredAt)}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between py-1.5">
+                        <span className="text-xs text-muted-foreground">Check-In</span>
+                        <span className="text-sm font-medium flex items-center gap-1.5">
+                          {detailReg.isCheckedIn ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <XCircle className="w-3.5 h-3.5 text-muted-foreground/40" />}
+                          {detailReg.isCheckedIn ? "Yes" : "No"}
+                        </span>
+                      </div>
+                      {detailReg.isCheckedIn && detailReg.checkedInAt && (
+                        <>
+                          <Separator />
+                          <div className="flex items-center justify-between py-1.5">
+                            <span className="text-xs text-muted-foreground">Checked In At</span>
+                            <span className="text-sm font-medium">{formatDate(detailReg.checkedInAt)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right column — User Profile */}
+                  <div className="px-6 py-4 space-y-3 border-t sm:border-t-0 border-border">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">User Profile</p>
+
+                    {detailUserLoading ? (
+                      <div className="flex items-center justify-center py-8 gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Loading...</span>
+                      </div>
+                    ) : detailUserError ? (
+                      <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                        <p className="text-sm text-muted-foreground">Profile unavailable</p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">User may have been deleted</p>
+                      </div>
+                    ) : detailUser ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" /> Phone</span>
+                          <span className="text-sm font-medium font-mono">{detailUser.phoneNumber || "–"}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Mail className="w-3 h-3" /> Email</span>
+                          <span className="text-sm font-medium truncate max-w-[180px]">{detailUser.email}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase className="w-3 h-3" /> Branch</span>
+                          <span className="text-sm font-medium">{detailUser.branch || "–"}</span>
+                        </div>
+                        <Separator />
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5"><GraduationCap className="w-3 h-3" /> Grad. Year</span>
+                          <span className="text-sm font-medium">{detailUser.graduationYear || "–"}</span>
+                        </div>
+
+                        {/* Social links */}
+                        {detailUser.socialMedia && Object.keys(detailUser.socialMedia).some(k => detailUser.socialMedia[k]) && (
+                          <>
+                            <Separator />
+                            <div className="py-1.5">
+                              <span className="text-xs text-muted-foreground">Social</span>
+                              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                {detailUser.socialMedia.linkedin && (
+                                  <a href={detailUser.socialMedia.linkedin} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 transition-colors">
+                                    <Linkedin className="w-3 h-3" /> LinkedIn <ExternalLink className="w-2.5 h-2.5 opacity-40" />
+                                  </a>
+                                )}
+                                {detailUser.socialMedia.github && (
+                                  <a href={detailUser.socialMedia.github} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 transition-colors">
+                                    <Github className="w-3 h-3" /> GitHub <ExternalLink className="w-2.5 h-2.5 opacity-40" />
+                                  </a>
+                                )}
+                                {detailUser.socialMedia.twitter && (
+                                  <a href={detailUser.socialMedia.twitter} target="_blank" rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 transition-colors">
+                                    <Twitter className="w-3 h-3" /> Twitter <ExternalLink className="w-2.5 h-2.5 opacity-40" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Resume */}
+                        {detailUser.resumeUrl && (
+                          <>
+                            <Separator />
+                            <div className="flex items-center justify-between py-1.5">
+                              <span className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="w-3 h-3" /> Resume</span>
+                              <a href={detailUser.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1">
+                                View <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </>
+                        )}
+
+                        <Separator />
+                        <div className="flex items-center justify-between py-1.5">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Users className="w-3 h-3" /> Participations</span>
+                          <span className="text-sm font-medium">{detailUser.participations?.length || 0} event{(detailUser.participations?.length || 0) !== 1 ? "s" : ""}</span>
+                        </div>
+
+                        {/* Timestamps */}
+                        {(detailUser.createdAt || detailUser.updatedAt) && (
+                          <>
+                            <Separator />
+                            <div className="flex items-center gap-3 py-1.5 text-[10px] text-muted-foreground">
+                              {detailUser.createdAt && <span>Joined {formatDate(detailUser.createdAt)}</span>}
+                              {detailUser.updatedAt && <span>· Updated {formatDate(detailUser.updatedAt)}</span>}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Footer ── */}
+              <div className="flex items-center justify-between px-6 py-3 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">ID</span>
+                  <code className="text-[11px] font-mono text-muted-foreground">{detailReg.userId}</code>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      const regId = detailReg.regId;
+                      setDetailReg(null);
+                      setConfirmDeleteRegId(regId);
+                    }}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={detailReg.isCheckedIn ? "outline" : "default"}
+                    className="h-8 px-3 text-xs"
+                    onClick={() => {
+                      handleToggleCheckIn(detailReg.regId, detailReg.isCheckedIn);
+                      setDetailReg(null);
+                    }}
+                  >
+                    {detailReg.isCheckedIn ? (
+                      <><XCircle className="mr-1.5 h-3.5 w-3.5" /> Undo Check-In</>
+                    ) : (
+                      <><CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Check In</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Add Registration Dialog ── */}
       <Dialog open={showAddReg} onOpenChange={(open) => {

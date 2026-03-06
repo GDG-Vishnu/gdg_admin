@@ -30,6 +30,7 @@ import {
   Linkedin,
   Globe,
   Mail,
+  Palette,
 } from "lucide-react";
 import type {
   ManagedEvent,
@@ -78,7 +79,7 @@ const EMPTY_OFFICIAL: EventOfficial = {
    Form state type
 ───────────────────────────────────────────── */
 
-type FormTab = "details" | "schedule" | "media" | "content" | "eligibility" | "officials" | "faqs" | "rules";
+type FormTab = "details" | "schedule" | "media" | "content" | "eligibility" | "officials" | "faqs" | "rules" | "theme";
 
 type EditFormState = {
   title: string; description: string;
@@ -92,12 +93,15 @@ type EditFormState = {
   isRegistrationOpen: boolean;
   createdBy: string;
   tags: string[]; keyHighlights: string[];
+  Theme: string[];
   eligYears: boolean[]; eligDepts: string[];
   organiser: string; coOrganiser: string; facilitator: string;
   eventOfficials: EventOfficial[];
   faqs: FAQ[];
   rules: Rule[];
 };
+
+const DEFAULT_THEME_COLORS = ["#57CAFF", "#5CDB6D", "#FFD427", "#FF7DAF"];
 
 const EMPTY_FORM: EditFormState = {
   title: "", description: "", bannerImage: "", posterImage: "",
@@ -107,6 +111,7 @@ const EMPTY_FORM: EditFormState = {
   regStartDate: "", regStartTime: "", regEndDate: "", regEndTime: "",
   isRegistrationOpen: false, createdBy: "",
   tags: [], keyHighlights: [],
+  Theme: [...DEFAULT_THEME_COLORS],
   eligYears: [true, true, true, true], eligDepts: [],
   organiser: "", coOrganiser: "", facilitator: "",
   eventOfficials: [], faqs: [], rules: [],
@@ -116,13 +121,18 @@ const EMPTY_FORM: EditFormState = {
    Helpers
 ───────────────────────────────────────────── */
 
+/** Outputs dd/mm/yyyy for display in the form */
 function toDateInput(d: string | null | undefined): string {
   if (!d) return "";
   try {
     const date = typeof d === "object" && (d as any)?._seconds
       ? new Date((d as any)._seconds * 1000)
       : new Date(d);
-    return date.toISOString().slice(0, 10);
+    if (isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${day}/${month}/${year}`;
   } catch { return ""; }
 }
 
@@ -132,15 +142,40 @@ function toTimeInput(d: string | null | undefined): string {
     const date = typeof d === "object" && (d as any)?._seconds
       ? new Date((d as any)._seconds * 1000)
       : new Date(d);
-    return date.toISOString().slice(11, 16);
+    if (isNaN(date.getTime())) return "";
+    // Use local timezone so the time input matches what the user originally entered
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
   } catch { return ""; }
+}
+
+/** Parse dd/mm/yyyy to yyyy-mm-dd */
+function parseDDMMYYYY(value: string): string {
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return "";
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** Auto-format a date input string: inserts slashes as the user types */
+function autoFormatDateInput(raw: string): string {
+  // Strip everything except digits and slashes
+  let digits = raw.replace(/[^\d]/g, "");
+  if (digits.length > 8) digits = digits.slice(0, 8);
+  if (digits.length >= 5) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  if (digits.length >= 3) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return digits;
 }
 
 function combineDatetime(date: string, time: string): string | null {
   if (!date) return null;
-  return time
-    ? new Date(`${date}T${time}`).toISOString()
-    : new Date(`${date}T00:00`).toISOString();
+  const iso = parseDDMMYYYY(date);
+  if (!iso) return null;
+  const dt = time
+    ? new Date(`${iso}T${time}`)
+    : new Date(`${iso}T00:00`);
+  if (isNaN(dt.getTime())) return null;
+  return dt.toISOString();
 }
 
 function eventToForm(e: ManagedEvent): EditFormState {
@@ -166,6 +201,7 @@ function eventToForm(e: ManagedEvent): EditFormState {
     createdBy:   e.createdBy || "",
     tags:         Array.isArray(e.tags) ? [...e.tags] : [],
     keyHighlights: Array.isArray(e.keyHighlights) ? [...e.keyHighlights] : [],
+    Theme:         Array.isArray(e.Theme) && e.Theme.length > 0 ? [...e.Theme] : [...DEFAULT_THEME_COLORS],
     eligYears:  e.eligibilityCriteria?.yearOfGrad ?? [true, true, true, true],
     eligDepts:  Array.isArray(e.eligibilityCriteria?.Dept)
       ? e.eligibilityCriteria.Dept.map((d: string) => d.replace(/&/g, ""))
@@ -193,6 +229,7 @@ function formToPayload(f: EditFormState) {
     isRegistrationOpen: f.isRegistrationOpen,
     createdBy: f.createdBy,
     tags: f.tags, keyHighlights: f.keyHighlights,
+    Theme: f.Theme,
     eligibilityCriteria: { yearOfGrad: f.eligYears, Dept: f.eligDepts },
     executiveBoard: { organiser: f.organiser, coOrganiser: f.coOrganiser, facilitator: f.facilitator },
     eventOfficials: f.eventOfficials,
@@ -371,6 +408,7 @@ export function ManagedEventEditDialog({
             { key: "officials"   as const, label: "Officials",   icon: <Mic className="w-3.5 h-3.5" /> },
             { key: "faqs"        as const, label: "FAQs",        icon: <HelpCircle className="w-3.5 h-3.5" /> },
             { key: "rules"       as const, label: "Rules",       icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+            { key: "theme"       as const, label: "Theme",       icon: <Palette className="w-3.5 h-3.5" /> },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -498,13 +536,25 @@ export function ManagedEventEditDialog({
                   ] as [keyof EditFormState, string, string][]).map(([field, label, type]) => (
                     <div key={field}>
                       <label className="text-xs font-medium text-muted-foreground">{label}</label>
-                      <input
-                        type={type}
-                        value={form[field] as string}
-                        onChange={(e) => updateField(field, e.target.value)}
-                        onClick={type === "time" ? (e) => (e.currentTarget as any).showPicker?.() : undefined}
-                        className={`w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${type === "time" ? "cursor-pointer" : ""}`}
-                      />
+                      {type === "date" ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="dd/mm/yyyy"
+                          value={form[field] as string}
+                          onChange={(e) => updateField(field, autoFormatDateInput(e.target.value))}
+                          maxLength={10}
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      ) : (
+                        <input
+                          type={type}
+                          value={form[field] as string}
+                          onChange={(e) => updateField(field, e.target.value)}
+                          onClick={(e) => (e.currentTarget as any).showPicker?.()}
+                          className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -570,13 +620,25 @@ export function ManagedEventEditDialog({
                     ] as [keyof EditFormState, string, string][]).map(([field, label, type]) => (
                       <div key={field}>
                         <label className="text-xs font-medium text-muted-foreground">{label}</label>
-                        <input
-                          type={type}
-                          value={form[field] as string}
-                          onChange={(e) => updateField(field, e.target.value)}
-                          onClick={type === "time" ? (e) => (e.currentTarget as any).showPicker?.() : undefined}
-                          className={`w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring ${type === "time" ? "cursor-pointer" : ""}`}
-                        />
+                        {type === "date" ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="dd/mm/yyyy"
+                            value={form[field] as string}
+                            onChange={(e) => updateField(field, autoFormatDateInput(e.target.value))}
+                            maxLength={10}
+                            className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                        ) : (
+                          <input
+                            type={type}
+                            value={form[field] as string}
+                            onChange={(e) => updateField(field, e.target.value)}
+                            onClick={(e) => (e.currentTarget as any).showPicker?.()}
+                            className="w-full mt-1 px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1005,9 +1067,60 @@ export function ManagedEventEditDialog({
             </div>
           )}
 
-        </div>
+          {/* ══ Theme ══ */}
+          {formTab === "theme" && (
+            <div className="space-y-6">
+              <section>
+                <SectionLabel icon={<Palette className="w-4 h-4" />} title="Theme Colors" />
+                <p className="text-sm text-muted-foreground mt-2 mb-4">Pick up to 5 colors for the event page theme. Click a swatch to change its color.</p>
+                <div className="flex flex-wrap gap-4 items-start">
+                  {form.Theme.map((color, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1.5 group relative">
+                      <div className="relative w-14 h-14 cursor-pointer">
+                        <div
+                          className="w-full h-full rounded-xl border-2 border-border shadow-sm hover:scale-110 transition-transform"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={(e) => {
+                            const updated = [...form.Theme];
+                            updated[i] = e.target.value;
+                            updateField("Theme", updated);
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                      </div>
+                      <span className="text-[11px] font-mono text-muted-foreground">{color}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateField("Theme", form.Theme.filter((_, idx) => idx !== i));
+                        }}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-muted rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-200 dark:hover:bg-red-900 transition-all"
+                      >
+                        <X className="w-3 h-3 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ))}
+                  {form.Theme.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => updateField("Theme", [...form.Theme, "#4285F4"])}
+                      className="w-14 h-14 rounded-xl border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                      title="Add color"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
 
-        {/* Footer */}
+        </div>
         <div className="flex items-center gap-3 px-6 py-4 border-t border-border bg-muted flex-shrink-0">
           <button
             onClick={handleSave}

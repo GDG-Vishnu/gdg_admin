@@ -61,6 +61,7 @@ export interface ManagedEvent {
   updatedAt: string | null;
   tags: string[];
   keyHighlights: string[];
+  Theme: string[];
   eligibilityCriteria: EligibilityCriteria;
   executiveBoard: ExecutiveBoard;
   eventOfficials: EventOfficial[];

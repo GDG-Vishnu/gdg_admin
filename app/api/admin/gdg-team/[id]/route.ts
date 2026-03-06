@@ -60,6 +60,9 @@ export async function PATCH(
       "revokedAt",
       "revokedBy",
       "revokedReason",
+      "rejectedAt",
+      "rejectedBy",
+      "rejectedReason",
     ];
 
     const data: Record<string, unknown> = {};
